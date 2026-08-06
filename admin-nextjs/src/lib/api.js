@@ -40,6 +40,7 @@ export const adminApi = {
   deleteUser: (uid) => api.delete(`/admin/users/${uid}`),
   getAllReviews: () => api.get('/admin/reviews'),
   deleteReview: (id) => api.delete(`/admin/reviews/${id}`),
+  broadcast: (data) => api.post('/admin/broadcast', data),
 };
 
 export default api;
