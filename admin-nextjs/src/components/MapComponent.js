@@ -2,36 +2,38 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-// Enhanced custom icon with Profile Image and Status Glow
-const createProfileMarker = (color, imageUrl) => {
-  const image = imageUrl || 'https://via.placeholder.com/40';
+// Elite Marker: Profile Image with High-Contrast Border and Status Dot
+const createEliteMarker = (status, imageUrl) => {
+  const color = status === 'online' ? '#10b981' : status === 'busy' ? '#6366f1' : '#94a3b8';
+  const img = imageUrl || 'https://via.placeholder.com/40';
+
   return new L.DivIcon({
     html: `
-      <div style="position: relative; width: 42px; height: 42px;">
+      <div style="position: relative; width: 48px; height: 48px;">
         <div style="
-          width: 42px;
-          height: 42px;
+          width: 48px;
+          height: 48px;
           border-radius: 50%;
-          border: 3px solid white;
-          box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+          border: 4px solid white;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
           overflow: hidden;
-          background: #f1f5f9;
+          background: #fff;
         ">
-          <img src="${image}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40'" />
+          <img src="${img}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40'" />
         </div>
         <div style="
           position: absolute;
-          bottom: 0;
-          right: 0;
+          bottom: 2px;
+          right: 2px;
           width: 14px;
           height: 14px;
           background-color: ${color};
-          border: 3px solid white;
+          border: 2px solid white;
           border-radius: 50%;
+          z-index: 20;
           box-shadow: 0 0 10px ${color};
-          z-index: 10;
         "></div>
         <div style="
           position: absolute;
@@ -40,85 +42,81 @@ const createProfileMarker = (color, imageUrl) => {
           transform: translateX(-50%);
           width: 0;
           height: 0;
-          border-left: 8px solid transparent;
-          border-right: 8px solid transparent;
-          border-top: 10px solid white;
-          margin-top: -4px;
+          border-left: 10px solid transparent;
+          border-right: 10px solid transparent;
+          border-top: 12px solid white;
+          margin-top: -6px;
+          filter: drop-shadow(0 4px 4px rgba(0,0,0,0.1));
         "></div>
       </div>
     `,
-    className: 'custom-profile-marker',
-    iconSize: [42, 52],
-    iconAnchor: [21, 52],
+    className: 'elite-marker-icon',
+    iconSize: [48, 60],
+    iconAnchor: [24, 60],
   });
 };
 
-const RecenterMap = ({ lat, lng }) => {
+// Component to handle dynamic map centering and zooming
+const MapController = ({ target }) => {
   const map = useMap();
   useEffect(() => {
-    if (lat && lng) {
-      map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
+    if (target?.lat && target?.lng) {
+      map.flyTo([target.lat, target.lng], 16, {
+        animate: true,
+        duration: 1.5,
+        easeLinearity: 0.25
+      });
     }
-  }, [lat, lng, map]);
-  return null;
-};
+  }, [target, map]);
 
-// Component to fix "white map" issue by invalidating size after initial render
-const MapResizeFix = () => {
-  const map = useMap();
   useEffect(() => {
+    // Initial size fix for Leaflet in Next.js/React
     setTimeout(() => {
-      map.invalidateSize();
-    }, 250);
+        map.invalidateSize();
+    }, 400);
   }, [map]);
+
   return null;
 };
 
 export default function MapComponent({ partners = [], selectedPartner }) {
-  // Default to Surat coordinates if no partner is selected
-  const defaultCenter = [21.1702, 72.8311];
-  const center = selectedPartner?.lat ? [selectedPartner.lat, selectedPartner.lng] : defaultCenter;
+  // Default center point (India/Surat area)
+  const defaultPos = [21.1702, 72.8311];
 
   return (
-    <div className="w-full h-full bg-slate-50">
+    <div className="w-full h-full bg-slate-50 font-sans">
       <MapContainer
-        center={center}
-        zoom={13}
+        center={defaultPos}
+        zoom={12}
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
-        scrollWheelZoom={true}
       >
+        {/* Google Maps Styled Professional Tiles (Unofficial) */}
         <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+          attribution='&copy; Google Maps'
         />
 
         {Array.isArray(partners) && partners.map((p) => {
           if (!p.lat || !p.lng || isNaN(p.lat) || isNaN(p.lng)) return null;
 
-          const statusColor = p.status === 'online' ? '#10b981' : p.status === 'busy' ? '#4f46e5' : '#94a3b8';
-
           return (
             <Marker
               key={p.uid}
               position={[p.lat, p.lng]}
-              icon={createProfileMarker(statusColor, p.profileImage)}
+              icon={createEliteMarker(p.status, p.profileImage)}
             >
-              <Popup offset={[0, -40]}>
-                <div className="p-1 min-w-[100px] text-center font-sans">
-                  <p className="font-bold text-slate-800 uppercase text-[10px] tracking-tight mb-1">{p.name}</p>
-                  <div className="flex items-center justify-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }}></div>
-                    <p className="text-[8px] font-bold text-slate-500 uppercase">{p.status}</p>
-                  </div>
+              <Popup offset={[0, -50]}>
+                <div className="p-1 text-center min-w-[100px]">
+                  <p className="font-bold text-slate-900 uppercase text-[10px] tracking-tight mb-1">{p.name}</p>
+                  <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-widest">{p.status}</p>
                 </div>
               </Popup>
             </Marker>
           );
         })}
 
-        <RecenterMap lat={selectedPartner?.lat} lng={selectedPartner?.lng} />
-        <MapResizeFix />
+        <MapController target={selectedPartner} />
       </MapContainer>
     </div>
   );
