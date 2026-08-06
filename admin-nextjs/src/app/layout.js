@@ -1,10 +1,4 @@
 import './globals.css'
-import { Inter } from 'next/font/google'
-
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-})
 
 export const metadata = {
   title: 'Madadwala Admin Dashboard',
@@ -15,9 +9,13 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet" />
       </head>
-      <body style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{children}</body>
+      <body style={{ fontFamily: "'Open Sans', sans-serif" }} className="antialiased font-normal">
+        {children}
+      </body>
     </html>
   )
 }
