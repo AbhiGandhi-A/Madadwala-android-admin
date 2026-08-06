@@ -41,6 +41,7 @@ export const adminApi = {
   getAllReviews: () => api.get('/admin/reviews'),
   deleteReview: (id) => api.delete(`/admin/reviews/${id}`),
   broadcast: (data) => api.post('/admin/broadcast', data),
+  getMonitor: () => api.get('/admin/operations-monitor'),
 };
 
 export default api;
