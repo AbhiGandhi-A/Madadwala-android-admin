@@ -388,15 +388,15 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
 const PendingView = ({ providers, onApprove }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
     {providers.length === 0 ? (
-       <div className="col-span-full p-40 bg-white rounded-[50px] border-4 border-dashed border-slate-50 text-center text-slate-200 font-black uppercase tracking-[15px] text-sm">Status Nominal</div>
+       <div className="col-span-full p-40 bg-white rounded-[50px] border-4 border-dashed border-slate-50 text-center text-slate-200 font-bold uppercase tracking-[15px] text-sm">Status Nominal</div>
     ) : (
       providers.map(p => (
         <div key={p.uid} className="bg-white p-10 rounded-[45px] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-300 text-center">
-          <button onClick={()=>onApprove(p.uid)} className="absolute top-6 right-6 p-3 bg-indigo-600 text-white rounded-2xl shadow-xl font-black uppercase text-[9px] tracking-widest hover:scale-105 active:scale-95 transition-all">Verify Node</button>
-          <img src={p.profileImage || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-[35px] object-cover ring-[10px] ring-slate-50 shadow-2xl mx-auto mb-8 transition-transform group-hover:rotate-6" />
-          <h4 className="font-black text-2xl tracking-tighter text-slate-800 uppercase">{p.name}</h4>
-          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[4px] mt-2 mb-8 opacity-60">{p.profession}</p>
-          <div className="p-5 bg-slate-50 rounded-[28px] border border-slate-100 shadow-inner flex justify-between items-center"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">ID: <span className="text-slate-700 tracking-tighter">{p.aadhaarNumber}</span></p><Eye size={18} className="text-indigo-400 cursor-pointer hover:scale-125 transition-all"/></div>
+          <button onClick={()=>onApprove(p.uid)} className="absolute top-6 right-6 p-3 bg-indigo-600 text-white rounded-2xl shadow-xl font-bold uppercase text-[9px] tracking-widest hover:scale-105 active:scale-95 transition-all">Verify Node</button>
+          <img src={p.profileImage || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-[35px] object-cover ring-[10px] ring-slate-50 shadow-2xl mx-auto mb-8" />
+          <h4 className="font-bold text-2xl tracking-tight text-slate-800 uppercase">{p.name}</h4>
+          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-[4px] mt-2 mb-8 opacity-60">{p.profession}</p>
+          <div className="p-5 bg-slate-50 rounded-[28px] border border-slate-100 shadow-inner flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: <span className="text-slate-700 tracking-tighter">{p.aadhaarNumber}</span></p><Eye size={18} className="text-indigo-400 cursor-pointer hover:scale-125 transition-all"/></div>
         </div>
       ))
     )}
