@@ -35,6 +35,11 @@ export const adminApi = {
   getChatMessages: (userId) => api.get(`/support/messages/${userId}`),
   sendSupportMessage: (data) => api.post('/support/messages', data),
   getReports: () => api.get('/admin/reports'),
+  sendWarning: (data) => api.post('/admin/send-notification', data),
+  adjustWallet: (data) => api.post('/admin/wallet/adjust', data),
+  deleteUser: (uid) => api.delete(`/admin/users/${uid}`),
+  getAllReviews: () => api.get('/admin/reviews'),
+  deleteReview: (id) => api.delete(`/admin/reviews/${id}`),
 };
 
 export default api;
