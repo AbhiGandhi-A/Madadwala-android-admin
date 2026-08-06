@@ -13,8 +13,22 @@ import dynamic from 'next/dynamic';
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), {
   ssr: false,
-  loading: () => <div className="h-full w-full bg-slate-50 flex items-center justify-center font-semibold text-slate-300 uppercase tracking-widest text-[10px]">Initializing System...</div>
+  loading: () => <div className="h-full w-full bg-gray-50 flex items-center justify-center text-sm font-medium text-gray-400">Loading map…</div>
 });
+
+/* ---------- Font (Inter) ---------- */
+const FontStyles = () => (
+  <style jsx global>{`
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    .madadwala-app, .madadwala-app * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+  `}</style>
+);
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('monitor');
@@ -60,7 +74,7 @@ export default function AdminDashboard() {
         case 'reviews': res = await adminApi.getAllReviews(); setData(p => ({...p, reviews: res.data})); break;
         case 'support': res = await adminApi.getSupportChats(); setData(p => ({...p, chats: res.data})); break;
       }
-    } catch (err) { setError("Data Sync Issue"); }
+    } catch (err) { setError("Couldn't load this data. Try refreshing."); }
     setLoading(false);
   };
 
@@ -75,280 +89,407 @@ export default function AdminDashboard() {
       else if (activeModal === 'wallet') { await adminApi.adjustWallet({ uid: selectedUser.uid, amount: formState.amount, type: formState.type, description: formState.description }); fetchTabData(activeTab); }
       else if (activeModal === 'broadcast') await adminApi.broadcast({ role: formState.role, title: formState.title, message: formState.message });
       else if (activeModal === 'delete') { await adminApi.deleteUser(selectedUser.uid); fetchTabData(activeTab); }
-      showToast("Command Success"); setActiveModal(null);
-    } catch (e) { showToast("Error", "error"); }
+      showToast("Done"); setActiveModal(null);
+    } catch (e) { showToast("Something went wrong", "error"); }
+  };
+
+  const tabTitles = {
+    monitor: 'Live map', analytics: 'Analytics', customers: 'Customers', 'providers-all': 'Partners',
+    'providers-pending': 'Pending approvals', withdrawals: 'Withdrawals', jobs: 'Active jobs',
+    'bookings-all': 'Booking history', categories: 'Categories', offers: 'Offers', banners: 'Banners',
+    settings: 'Settings', reports: 'Reports', reviews: 'Reviews', support: 'Support'
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden font-sans text-[12px] antialiased">
+    <div className="madadwala-app flex h-screen bg-gray-50 text-gray-900 overflow-hidden text-[13px]">
+      <FontStyles />
+
       {toast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in duration-200">
-            <div className={`px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 border bg-white ${toast.type === 'success' ? 'border-emerald-500 text-emerald-600' : 'border-red-500 text-red-600'}`}>
-                <Check size={14} />
-                <span className="font-bold uppercase text-[10px] tracking-wider">{toast.message}</span>
-            </div>
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className={`px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 border text-sm font-medium ${toast.type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-white border-red-200 text-red-700'}`}>
+            {toast.type === 'success' ? <Check size={15} /> : <XCircle size={15} />}
+            <span>{toast.message}</span>
+          </div>
         </div>
       )}
 
-      <aside className="w-56 bg-slate-950 text-white flex flex-col shrink-0 z-20 shadow-2xl">
-        <div className="h-16 flex items-center px-6 border-b border-white/5 font-extrabold text-xl tracking-tight">MADADWALA</div>
-        <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto custom-scrollbar font-normal">
-          <NavItem icon={<Activity size={16}/>} label="Mission Control" active={activeTab==='monitor'} onClick={()=>setActiveTab('monitor')} />
+      {/* Sidebar */}
+      <aside className="w-60 bg-[#111827] text-gray-300 flex flex-col shrink-0">
+        <div className="h-16 px-5 flex items-center border-b border-white/10">
+          <span className="font-bold text-lg text-white tracking-tight">Madadwala</span>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto custom-scrollbar">
+          <NavItem icon={<Activity size={16}/>} label="Live map" active={activeTab==='monitor'} onClick={()=>setActiveTab('monitor')} />
           <NavItem icon={<BarChart3 size={16}/>} label="Analytics" active={activeTab==='analytics'} onClick={()=>setActiveTab('analytics')} />
-          <div className="pt-5 pb-1.5 px-3 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Core</div>
-          <NavItem icon={<Users size={16}/>} label="Consumers" active={activeTab==='customers'} onClick={()=>setActiveTab('customers')} />
+
+          <SectionLabel label="People" />
+          <NavItem icon={<Users size={16}/>} label="Customers" active={activeTab==='customers'} onClick={()=>setActiveTab('customers')} />
           <NavItem icon={<UserCheck size={16}/>} label="Partners" active={activeTab==='providers-all'} onClick={()=>setActiveTab('providers-all')} />
           <NavItem icon={<ShieldAlert size={16}/>} label="Approvals" active={activeTab==='providers-pending'} onClick={()=>setActiveTab('providers-pending')} count={data.pendingProviders.length} />
 
-          <div className="pt-5 pb-1.5 px-3 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Operations</div>
-          <NavItem icon={<CreditCard size={16}/>} label="Payouts" active={activeTab==='withdrawals'} onClick={()=>setActiveTab('withdrawals')} count={data.withdrawals.length} />
-          <NavItem icon={<Navigation size={16}/>} label="Live Map" active={activeTab==='jobs'} onClick={()=>setActiveTab('jobs')} />
+          <SectionLabel label="Operations" />
+          <NavItem icon={<CreditCard size={16}/>} label="Withdrawals" active={activeTab==='withdrawals'} onClick={()=>setActiveTab('withdrawals')} count={data.withdrawals.length} />
+          <NavItem icon={<Navigation size={16}/>} label="Active jobs" active={activeTab==='jobs'} onClick={()=>setActiveTab('jobs')} />
           <NavItem icon={<Briefcase size={16}/>} label="History" active={activeTab==='bookings-all'} onClick={()=>setActiveTab('bookings-all')} />
 
-          <div className="pt-5 pb-1.5 px-3 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Feedback</div>
+          <SectionLabel label="Feedback" />
           <NavItem icon={<FileText size={16}/>} label="Reports" active={activeTab==='reports'} onClick={()=>setActiveTab('reports')} />
           <NavItem icon={<Star size={16}/>} label="Reviews" active={activeTab==='reviews'} onClick={()=>setActiveTab('reviews')} />
           <NavItem icon={<MessageSquare size={16}/>} label="Support" active={activeTab==='support'} onClick={()=>setActiveTab('support')} />
 
-          <div className="pt-5 pb-1.5 px-3 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Admin</div>
+          <SectionLabel label="Configuration" />
           <NavItem icon={<Tag size={16}/>} label="Categories" active={activeTab==='categories'} onClick={()=>setActiveTab('categories')} />
           <NavItem icon={<ImageIcon size={16}/>} label="Banners" active={activeTab==='banners'} onClick={()=>setActiveTab('banners')} />
           <NavItem icon={<Bell size={16}/>} label="Offers" active={activeTab==='offers'} onClick={()=>setActiveTab('offers')} />
           <NavItem icon={<Settings size={16}/>} label="Settings" active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} />
         </nav>
-        <div className="p-4"><button onClick={()=>openAction('broadcast')} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] uppercase rounded-lg shadow-lg flex items-center justify-center gap-2">Broadcast</button></div>
+        <div className="p-3 border-t border-white/10">
+          <button onClick={()=>openAction('broadcast')} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[12.5px] rounded-lg flex items-center justify-center gap-2 transition-colors">
+            <Send size={14}/> Broadcast message
+          </button>
+        </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 bg-white shadow-inner">
-        <header className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-8 shrink-0 z-10">
-          <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{activeTab.replace('-', ' ')}</h2>
-          <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center text-white font-bold text-[11px] shadow-lg">A</div>
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
+          <h2 className="text-[15px] font-semibold text-gray-900">{tabTitles[activeTab] || activeTab}</h2>
+          <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold text-xs">A</div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-0 bg-slate-50/30">
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50">
           {loading ? (
-             <div className="flex flex-col items-center justify-center h-full gap-3">
-               <div className="w-6 h-6 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-               <p className="text-slate-400 font-bold uppercase text-[9px] tracking-widest">Syncing Systems...</p>
-             </div>
+            <div className="flex flex-col items-center justify-center h-full gap-3">
+              <div className="w-6 h-6 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+              <p className="text-gray-400 text-sm font-medium">Loading…</p>
+            </div>
           ) : (
-            <div className={`h-full ${activeTab !== 'monitor' ? 'p-8 max-w-[1400px] mx-auto' : ''}`}>
+            <div className={activeTab !== 'monitor' ? 'p-6 max-w-[1400px] mx-auto' : 'h-full'}>
               {activeTab === 'monitor' && <MonitorView data={data.monitor} onRefresh={()=>fetchTabData('monitor')} selectedPartner={selectedPartner} setSelectedPartner={setSelectedPartner} />}
               {activeTab === 'analytics' && <AnalyticsView data={data.analytics} />}
               {activeTab === 'customers' && <UsersTable users={data.allUsers} onWarn={(u)=>openAction('warning', u)} onWallet={(u)=>openAction('wallet', u)} onDelete={(u)=>openAction('delete', u)} onBlock={(u)=>adminApi.toggleBlock(u.uid).then(()=>{fetchTabData('customers'); showToast("Updated");})} onDetails={(u)=>openAction('details', u)} title="Customers" />}
               {activeTab === 'providers-all' && <UsersTable users={data.allProviders} onWarn={(u)=>openAction('warning', u)} onWallet={(u)=>openAction('wallet', u)} onDelete={(u)=>openAction('delete', u)} onBlock={(u)=>adminApi.toggleBlock(u.uid).then(()=>{fetchTabData('providers-all'); showToast("Updated");})} onDetails={(u)=>openAction('details', u)} title="Partners" isPartner />}
-              {activeTab === 'providers-pending' && <PendingView providers={data.pendingProviders} onApprove={(uid)=>adminApi.approveProvider(uid).then(()=>{fetchTabData('providers-pending'); showToast("Verified");})} />}
+              {activeTab === 'providers-pending' && <PendingView providers={data.pendingProviders} onApprove={(uid)=>adminApi.approveProvider(uid).then(()=>{fetchTabData('providers-pending'); showToast("Approved");})} />}
               {activeTab === 'withdrawals' && <WithdrawalsTable withdrawals={data.withdrawals} onHandle={(id, s)=>adminApi.updateWithdrawal(id, {status:s}).then(()=>{fetchTabData('withdrawals'); showToast("Processed");})} />}
-              {activeTab === 'jobs' && <JobsTable jobs={data.activeJobs} title="Live Tracking" />}
-              {activeTab === 'bookings-all' && <JobsTable jobs={data.allBookings} title="Archives" />}
+              {activeTab === 'jobs' && <JobsTable jobs={data.activeJobs} title="Active jobs" />}
+              {activeTab === 'bookings-all' && <JobsTable jobs={data.allBookings} title="Booking history" />}
               {activeTab === 'categories' && <CategoriesView categories={data.categories} refresh={()=>fetchTabData('categories')} />}
               {activeTab === 'offers' && <OffersView offers={data.offers} refresh={()=>fetchTabData('offers')} />}
               {activeTab === 'banners' && <BannersView banners={data.banners} refresh={()=>fetchTabData('banners')} />}
               {activeTab === 'reports' && <ReportsView reports={data.reports} />}
-              {activeTab === 'reviews' && <ReviewsView reviews={data.reviews} onDelete={(id)=>adminApi.deleteReview(id).then(()=>{fetchTabData('reviews'); showToast("Purged");})} />}
-              {activeTab === 'settings' && <SettingsView settings={data.settings} refresh={()=>{fetchTabData('settings'); showToast("Synced");}} />}
+              {activeTab === 'reviews' && <ReviewsView reviews={data.reviews} onDelete={(id)=>adminApi.deleteReview(id).then(()=>{fetchTabData('reviews'); showToast("Deleted");})} />}
+              {activeTab === 'settings' && <SettingsView settings={data.settings} refresh={()=>{fetchTabData('settings'); showToast("Saved");}} />}
               {activeTab === 'support' && <SupportView chats={data.chats} />}
             </div>
           )}
         </main>
       </div>
 
+      {/* Slide-over modal */}
       {activeModal && (
-          <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-              <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={()=>setActiveModal(null)}></div>
-              <div className="relative w-80 bg-white shadow-2xl h-full flex flex-col border-l border-slate-100 animate-in slide-in-from-right duration-200">
-                  <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between">
-                      <h3 className="font-bold text-slate-900 text-sm uppercase tracking-widest">{activeModal}</h3>
-                      <button onClick={()=>setActiveModal(null)} className="p-1.5 hover:bg-slate-50 rounded-full text-slate-400 transition-all"><X size={18}/></button>
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-gray-900/40" onClick={()=>setActiveModal(null)}></div>
+          <div className="relative w-96 bg-white shadow-2xl h-full flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900 text-[15px] capitalize">
+                {activeModal === 'warning' && 'Send warning'}
+                {activeModal === 'wallet' && 'Adjust wallet'}
+                {activeModal === 'broadcast' && 'Broadcast message'}
+                {activeModal === 'delete' && 'Delete account'}
+                {activeModal === 'details' && 'Account details'}
+              </h3>
+              <button onClick={()=>setActiveModal(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"><X size={18}/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+              {selectedUser && activeModal !== 'broadcast' && (
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <img src={selectedUser.profileImage || 'https://via.placeholder.com/40'} className="w-11 h-11 rounded-full object-cover" />
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{selectedUser.name}</p>
+                    <p className="text-[12px] text-gray-500">{selectedUser.phoneNumber}</p>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
-                      {selectedUser && activeModal !== 'broadcast' && (
-                          <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
-                              <img src={selectedUser.profileImage || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-lg object-cover ring-2 ring-white shadow-sm" />
-                              <div><p className="font-bold text-slate-900 text-xs">{selectedUser.name}</p><p className="text-[10px] text-slate-400 font-medium">{selectedUser.phoneNumber}</p></div>
-                          </div>
-                      )}
+                </div>
+              )}
 
-                      {activeModal === 'warning' && (
-                          <div className="space-y-4">
-                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Class</label>
-                              <input value={formState.title} onChange={e=>setFormState({...formState, title: e.target.value})} placeholder="Violation Title" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none font-bold text-[11px] focus:border-indigo-500" />
-                              <textarea rows={8} value={formState.message} onChange={e=>setFormState({...formState, message: e.target.value})} placeholder="Full details..." className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium text-[11px] resize-none focus:border-indigo-500" />
-                          </div>
-                      )}
-
-                      {activeModal === 'wallet' && (
-                          <div className="space-y-6">
-                              <div className="flex gap-2">
-                                  <button onClick={()=>setFormState({...formState, type: 'credit'})} className={`flex-1 py-2.5 rounded-lg font-bold text-[10px] border transition-all ${formState.type === 'credit' ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-slate-50 text-slate-400'}`}>Inject (+)</button>
-                                  <button onClick={()=>setFormState({...formState, type: 'debit'})} className={`flex-1 py-2.5 rounded-lg font-bold text-[10px] border transition-all ${formState.type === 'debit' ? 'bg-red-600 border-red-600 text-white shadow-md' : 'bg-slate-50 text-slate-400'}`}>Extract (-)</button>
-                              </div>
-                              <div className="space-y-2">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Asset Value</label>
-                                  <input type="number" value={formState.amount} onChange={e=>setFormState({...formState, amount: e.target.value})} placeholder="₹ 0.00" className="w-full p-5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-3xl text-center" />
-                              </div>
-                          </div>
-                      )}
-
-                      {activeModal === 'details' && selectedUser && (
-                          <div className="space-y-10">
-                              <div className="grid grid-cols-2 gap-3 text-center text-[10px]">
-                                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100"><p className="text-indigo-400 font-bold mb-0.5 uppercase text-[8px]">Revenue</p><p className="font-bold text-sm text-indigo-600 tracking-tight">₹{selectedUser.totalEarnings || 0}</p></div>
-                                  <div className="p-4 bg-slate-900 rounded-2xl text-white shadow-md"><p className="opacity-60 font-bold mb-0.5 uppercase text-[8px]">Jobs</p><p className="font-bold text-sm">{selectedUser.totalJobs || 0}</p></div>
-                              </div>
-                              <div className="space-y-4">
-                                  <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-[2px] border-b pb-3 flex items-center gap-2">Activity Log</h4>
-                                  <div className="space-y-3">
-                                      {selectedUser.activityLog?.slice(-8).reverse().map((log, i) => (
-                                          <div key={i} className="p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                                              <div className="flex justify-between items-center mb-1"><span className="text-[9px] font-bold text-indigo-600 uppercase">{log.event}</span><span className="text-[8px] text-slate-300">{new Date(log.timestamp).toLocaleDateString()}</span></div>
-                                              <p className="text-[10px] text-slate-500 font-medium leading-relaxed opacity-80">"{log.description}"</p>
-                                          </div>
-                                      ))}
-                                  </div>
-                              </div>
-                          </div>
-                      )}
+              {activeModal === 'warning' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Title</label>
+                    <input value={formState.title} onChange={e=>setFormState({...formState, title: e.target.value})} placeholder="e.g. Policy violation" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[13px] focus:border-indigo-400 focus:bg-white transition-colors" />
                   </div>
-                  <div className="p-6 border-t border-slate-50 bg-white">
-                      <button onClick={handleAction} className={`w-full py-4 rounded-xl font-bold uppercase text-[10px] tracking-[4px] shadow-2xl transition-all active:scale-95 ${activeModal === 'delete' ? 'bg-red-600 text-white shadow-red-200' : 'bg-slate-950 text-white shadow-slate-200'}`}>Execute command</button>
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Message</label>
+                    <textarea rows={7} value={formState.message} onChange={e=>setFormState({...formState, message: e.target.value})} placeholder="Describe what happened…" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[13px] resize-none focus:border-indigo-400 focus:bg-white transition-colors" />
                   </div>
-              </div>
+                </div>
+              )}
+
+              {activeModal === 'wallet' && (
+                <div className="space-y-5">
+                  <div className="flex gap-2">
+                    <button onClick={()=>setFormState({...formState, type: 'credit'})} className={`flex-1 py-2.5 rounded-lg font-semibold text-[12.5px] border transition-colors ${formState.type === 'credit' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>Add funds</button>
+                    <button onClick={()=>setFormState({...formState, type: 'debit'})} className={`flex-1 py-2.5 rounded-lg font-semibold text-[12.5px] border transition-colors ${formState.type === 'debit' ? 'bg-red-600 border-red-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>Deduct funds</button>
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Amount</label>
+                    <input type="number" value={formState.amount} onChange={e=>setFormState({...formState, amount: e.target.value})} placeholder="₹0" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none font-semibold text-2xl text-center focus:border-indigo-400 focus:bg-white transition-colors" />
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Note (optional)</label>
+                    <input value={formState.description} onChange={e=>setFormState({...formState, description: e.target.value})} placeholder="Reason for this adjustment" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[13px] focus:border-indigo-400 focus:bg-white transition-colors" />
+                  </div>
+                </div>
+              )}
+
+              {activeModal === 'broadcast' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Send to</label>
+                    <select value={formState.role} onChange={e=>setFormState({...formState, role: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[13px] focus:border-indigo-400">
+                      <option value="all">Everyone</option>
+                      <option value="customer">Customers</option>
+                      <option value="provider">Partners</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Title</label>
+                    <input value={formState.title} onChange={e=>setFormState({...formState, title: e.target.value})} placeholder="Notification title" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[13px] focus:border-indigo-400 focus:bg-white transition-colors" />
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Message</label>
+                    <textarea rows={6} value={formState.message} onChange={e=>setFormState({...formState, message: e.target.value})} placeholder="Write your announcement…" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[13px] resize-none focus:border-indigo-400 focus:bg-white transition-colors" />
+                  </div>
+                </div>
+              )}
+
+              {activeModal === 'delete' && (
+                <p className="text-[13px] text-gray-600 leading-relaxed">This permanently removes the account and its data. This can't be undone.</p>
+              )}
+
+              {activeModal === 'details' && selectedUser && (
+                <div className="space-y-8">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                      <p className="text-indigo-500 text-[11px] font-medium mb-1">Earnings</p>
+                      <p className="font-bold text-lg text-indigo-700">₹{selectedUser.totalEarnings || 0}</p>
+                    </div>
+                    <div className="p-4 bg-gray-900 rounded-xl text-white">
+                      <p className="text-gray-400 text-[11px] font-medium mb-1">Jobs completed</p>
+                      <p className="font-bold text-lg">{selectedUser.totalJobs || 0}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <h4 className="text-[12px] font-semibold text-gray-900 uppercase tracking-wide border-b border-gray-100 pb-2">Recent activity</h4>
+                    <div className="space-y-2">
+                      {selectedUser.activityLog?.slice(-8).reverse().map((log, i) => (
+                        <div key={i} className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] font-semibold text-indigo-600 uppercase">{log.event}</span>
+                            <span className="text-[10px] text-gray-400">{new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                          </div>
+                          <p className="text-[12px] text-gray-600">{log.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-5 border-t border-gray-100">
+              <button onClick={handleAction} className={`w-full py-3 rounded-xl font-semibold text-[13px] shadow-sm transition-colors active:scale-[0.98] ${activeModal === 'delete' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-gray-900 hover:bg-gray-800 text-white'}`}>
+                {activeModal === 'delete' ? 'Delete account' : activeModal === 'broadcast' ? 'Send broadcast' : 'Save'}
+              </button>
+            </div>
           </div>
+        </div>
       )}
     </div>
   );
 }
 
-function NavItem({ icon, label, active, onClick, count, pulse }) {
+function SectionLabel({ label }) {
+  return <div className="pt-4 pb-1 px-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{label}</div>;
+}
+
+function NavItem({ icon, label, active, onClick, count }) {
   return (
-    <button onClick={onClick} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-100 ${active ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-      <div className="flex items-center space-x-3">
-        {pulse && !active && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping absolute -ml-0.5"></div>}
-        {icon}<span className="font-semibold text-[13px] tracking-tight">{label}</span>
+    <button onClick={onClick} className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${active ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+      <div className="flex items-center gap-2.5">
+        {icon}<span className="font-medium text-[13px]">{label}</span>
       </div>
-      {count > 0 && <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${active ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'}`}>{count}</span>}
+      {count > 0 && <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full min-w-[18px] text-center ${active ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'}`}>{count}</span>}
     </button>
   );
 }
 
+/* ---------- Live map ---------- */
 const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner }) => {
   const [filter, setFilter] = useState('all');
   const filteredData = data.filter(p => filter === 'all' || p.status === filter);
   const counts = { total: data.length, online: data.filter(p => p.status === 'online').length, busy: data.filter(p => p.status === 'busy').length };
 
   return (
-    <div className="p-6 space-y-6 bg-slate-50/50 h-full flex flex-col font-sans">
-        <div className="flex justify-between items-end">
-            <div><h3 className="text-xl font-bold text-slate-800 tracking-tight uppercase">Live Partner Tracking</h3><p className="text-slate-400 font-medium text-[9px] uppercase mt-0.5 tracking-wider">Fleet Monitoring Console</p></div>
-            <div className="flex gap-2">
-                <StatusPill color="bg-emerald-500" label="Online" count={counts.online} />
-                <StatusPill color="bg-indigo-500" label="Busy" count={counts.busy} />
-            </div>
+    <div className="p-6 space-y-5 h-full flex flex-col">
+      <div className="flex justify-between items-end">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Live partner tracking</h3>
+          <p className="text-gray-500 text-[12.5px] mt-0.5">See where partners are and what they're doing right now</p>
+        </div>
+        <div className="flex gap-2">
+          <StatusPill color="bg-emerald-500" label="Online" count={counts.online} />
+          <StatusPill color="bg-indigo-500" label="Busy" count={counts.busy} />
+        </div>
+      </div>
+
+      <div className="flex-1 flex gap-5 min-h-0">
+        <div className="w-72 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="p-2.5 border-b border-gray-100 flex gap-1.5 bg-gray-50">
+            {['all', 'online', 'busy'].map(f => (
+              <button key={f} onClick={()=>setFilter(f)} className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold capitalize transition-colors ${filter===f ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>{f}</button>
+            ))}
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+            {filteredData.map(p => (
+              <div key={p.uid} onClick={()=>setSelectedPartner(p)} className={`p-2.5 rounded-lg cursor-pointer transition-colors border ${selectedPartner?.uid === p.uid ? 'bg-indigo-50 border-indigo-200' : 'bg-transparent border-transparent hover:bg-gray-50'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <img src={p.profileImage || 'https://via.placeholder.com/24'} className="w-9 h-9 rounded-lg object-cover" />
+                    <div>
+                      <p className="font-semibold text-gray-800 text-[12.5px] truncate w-24">{p.name}</p>
+                      <p className="text-[11px] text-gray-400">{p.phoneNumber}</p>
+                    </div>
+                  </div>
+                  <div className={`w-2 h-2 rounded-full ${p.status === 'busy' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-[11px] font-medium text-gray-400 text-center">{filteredData.length} partners shown</div>
         </div>
 
-        <div className="flex-1 flex gap-6 min-h-0">
-            <div className="w-72 flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                <div className="p-3 border-b border-slate-100 flex gap-1 bg-slate-50/50">
-                    {['all', 'online', 'busy'].map(f => (
-                        <button key={f} onClick={()=>setFilter(f)} className={`flex-1 py-1.5 rounded-lg text-[8px] font-bold uppercase transition-all ${filter===f ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200'}`}>{f}</button>
-                    ))}
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                    {filteredData.map(p => (
-                        <div key={p.uid} onClick={()=>setSelectedPartner(p)} className={`p-3 rounded-xl cursor-pointer transition-all border ${selectedPartner?.uid === p.uid ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-50' : 'bg-transparent border-transparent hover:bg-slate-50'}`}>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <img src={p.profileImage || 'https://via.placeholder.com/24'} className="w-8 h-8 rounded-lg object-cover shadow-sm border border-white" />
-                                    <div><p className="font-bold text-slate-800 text-[11px] uppercase truncate w-24 tracking-tighter">{p.name}</p><p className="text-[8px] font-medium text-slate-400 uppercase tracking-tighter">{p.phoneNumber}</p></div>
-                                </div>
-                                <div className={`w-1.5 h-1.5 rounded-full ${p.status === 'busy' ? 'bg-indigo-500' : 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]'}`}></div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <div className="p-2.5 bg-slate-50 border-t border-slate-100 text-[9px] font-bold text-slate-400 text-center uppercase tracking-widest">{filteredData.length} Nodes Operational</div>
-            </div>
-
-            <div className="flex-1 bg-white rounded-2xl relative overflow-hidden border border-slate-200 shadow-xl shadow-slate-100">
-                <div className="absolute inset-0 z-0"><MapComponent partners={filteredData} selectedPartner={selectedPartner} /></div>
-                <button onClick={onRefresh} className="absolute top-4 right-4 p-2.5 bg-white shadow-xl rounded-xl z-10 hover:bg-slate-50 transition-all border border-slate-100"><RefreshCw size={14}/></button>
-                <div className="absolute bottom-4 right-4 z-10"><button className="p-3 bg-slate-950 shadow-2xl rounded-xl text-white hover:bg-indigo-600 transition-colors shadow-indigo-200"><Navigation size={18}/></button></div>
-                <div className="absolute bottom-4 left-4 p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex gap-6 border border-white/50 z-10">
-                    <Legend color="bg-emerald-500" label="Online" /><Legend color="bg-indigo-600" label="Busy" /><Legend color="bg-slate-300" label="Offline" />
-                </div>
-            </div>
+        <div className="flex-1 bg-white rounded-xl relative overflow-hidden border border-gray-200">
+          <div className="absolute inset-0 z-0"><MapComponent partners={filteredData} selectedPartner={selectedPartner} /></div>
+          <button onClick={onRefresh} className="absolute top-4 right-4 p-2.5 bg-white shadow-md rounded-lg z-10 hover:bg-gray-50 transition-colors border border-gray-100"><RefreshCw size={14}/></button>
+          <div className="absolute bottom-4 left-4 p-3 bg-white/95 backdrop-blur rounded-xl shadow-md flex gap-5 border border-gray-100 z-10">
+            <Legend color="bg-emerald-500" label="Online" /><Legend color="bg-indigo-600" label="Busy" /><Legend color="bg-gray-300" label="Offline" />
+          </div>
         </div>
+      </div>
 
-        {selectedPartner && (
-            <div className="bg-white p-6 rounded-[32px] shadow-2xl border border-slate-100 flex items-center justify-between gap-10 animate-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-center gap-6 flex-shrink-0">
-                    <img src={selectedPartner.profileImage || 'https://via.placeholder.com/80'} className="w-16 h-16 rounded-2xl object-cover shadow-2xl ring-4 ring-slate-50" />
-                    <div><div className="flex items-center gap-3"><h4 className="font-bold text-slate-900 text-lg uppercase tracking-tight">{selectedPartner.name}</h4><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-bold uppercase tracking-widest">{selectedPartner.status}</span></div><p className="font-bold text-slate-400 text-xs mt-1">{selectedPartner.phoneNumber}</p></div>
-                </div>
-                <div className="h-12 w-px bg-slate-100"></div>
-                <div><p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 opacity-50 tracking-widest">Coordination Link</p><p className="font-bold text-slate-800 text-xs tracking-widest font-mono">{selectedPartner.lat?.toFixed(5) || '0.00'}, {selectedPartner.lng?.toFixed(5) || '0.00'}</p><p className="text-[8px] font-bold text-emerald-500 mt-1 uppercase">Link Verified</p></div>
-                <div className="flex flex-col gap-1.5"><button className="px-10 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all border border-indigo-100">Center Node</button><button className="px-10 py-2.5 bg-slate-950 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-xl transition-all">Direct Comms</button></div>
+      {selectedPartner && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-between gap-8">
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <img src={selectedPartner.profileImage || 'https://via.placeholder.com/64'} className="w-14 h-14 rounded-xl object-cover" />
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h4 className="font-semibold text-gray-900 text-[15px]">{selectedPartner.name}</h4>
+                <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-semibold capitalize">{selectedPartner.status}</span>
+              </div>
+              <p className="font-medium text-gray-400 text-[12.5px] mt-0.5">{selectedPartner.phoneNumber}</p>
             </div>
-        )}
+          </div>
+          <div className="h-10 w-px bg-gray-100"></div>
+          <div>
+            <p className="text-[11px] font-medium text-gray-400 mb-1">Current location</p>
+            <p className="font-medium text-gray-700 text-[12.5px] font-mono">{selectedPartner.lat?.toFixed(5) || '0.00'}, {selectedPartner.lng?.toFixed(5) || '0.00'}</p>
+          </div>
+          <div className="flex flex-col gap-2 ml-auto">
+            <button className="px-6 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg font-semibold text-[12px] transition-colors">Center on map</button>
+            <button className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-semibold text-[12px] transition-colors">Contact partner</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 const StatusPill = ({ color, label, count }) => (
-    <div className="px-4 py-2 bg-white border border-slate-200 rounded-full shadow-sm flex items-center gap-3"><div className={`w-1.5 h-1.5 rounded-full ${color}`}></div><span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{label}</span><span className="text-xs font-bold text-slate-900">{count}</span></div>
+  <div className="px-3.5 py-2 bg-white border border-gray-200 rounded-full flex items-center gap-2.5">
+    <div className={`w-2 h-2 rounded-full ${color}`}></div>
+    <span className="text-[11.5px] font-medium text-gray-500">{label}</span>
+    <span className="text-[12.5px] font-semibold text-gray-900">{count}</span>
+  </div>
 );
 
 const Legend = ({ color, label }) => (
-    <div className="flex items-center gap-2.5"><div className={`w-3 h-3 rounded-full ${color}`}></div><span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">{label}</span></div>
+  <div className="flex items-center gap-2">
+    <div className={`w-2.5 h-2.5 rounded-full ${color}`}></div>
+    <span className="text-[11px] font-medium text-gray-500">{label}</span>
+  </div>
 );
 
+/* ---------- Analytics ---------- */
 const AnalyticsView = ({ data }) => !data ? null : (
   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in duration-300">
-    <StatCard title="Consumers" value={data.totalUsers} color="text-indigo-600" />
+    <StatCard title="Customers" value={data.totalUsers} color="text-indigo-600" />
     <StatCard title="Partners" value={data.totalProviders} color="text-emerald-600" />
-    <StatCard title="Revenue" value={`₹${data.totalRevenue?.toLocaleString()}`} color="text-slate-950" />
-    <StatCard title="Total Jobs" value={data.totalBookings} color="text-blue-600" />
-    <div className="col-span-full bg-white p-10 rounded-3xl border border-slate-200 shadow-sm mt-4">
-        <h3 className="font-bold text-slate-800 uppercase tracking-[4px] text-[10px] mb-12 text-center opacity-40">Resource Allocation Matrix</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-10">
-            {data.categories?.map((cat, i) => (
-                <div key={i}>
-                    <div className="flex justify-between items-end mb-2.5"><p className="text-[10px] font-bold text-slate-500 uppercase tracking-[2px]">{cat.name}</p><p className="text-xl font-bold text-slate-900">{Math.round(cat.ratio * 100)}%</p></div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden"><div className="bg-indigo-500 h-full rounded-full transition-all duration-1000 shadow-sm" style={{ width: `${cat.ratio * 100}%` }}></div></div>
-                </div>
-            ))}
-        </div>
+    <StatCard title="Revenue" value={`₹${data.totalRevenue?.toLocaleString()}`} color="text-gray-900" />
+    <StatCard title="Total jobs" value={data.totalBookings} color="text-blue-600" />
+    <div className="col-span-full bg-white p-8 rounded-2xl border border-gray-200 mt-2">
+      <h3 className="font-semibold text-gray-900 text-[14px] mb-8">Jobs by category</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-7">
+        {data.categories?.map((cat, i) => (
+          <div key={i}>
+            <div className="flex justify-between items-end mb-2">
+              <p className="text-[12.5px] font-medium text-gray-500">{cat.name}</p>
+              <p className="text-[15px] font-semibold text-gray-900">{Math.round(cat.ratio * 100)}%</p>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-indigo-500 h-full rounded-full transition-all duration-700" style={{ width: `${cat.ratio * 100}%` }}></div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   </div>
 );
 
 const StatCard = ({ title, value, color }) => (
-  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all">
-    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 opacity-60">{title}</p>
-    <p className={`text-2xl font-bold tracking-tighter ${color}`}>{value || 0}</p>
+  <div className="bg-white p-5 rounded-2xl border border-gray-200 hover:shadow-md transition-shadow">
+    <p className="text-[12px] font-medium text-gray-500 mb-1.5">{title}</p>
+    <p className={`text-2xl font-bold tracking-tight ${color}`}>{value || 0}</p>
   </div>
 );
 
+/* ---------- Users table ---------- */
 const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, title }) => (
-  <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
-    <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center"><h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-widest">{title} Registry</h3><span className="px-4 py-1 bg-slate-50 rounded-full text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{users?.length || 0} SECURE NODES</span></div>
+  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+    <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+      <h3 className="font-semibold text-gray-900 text-[14px]">{title}</h3>
+      <span className="px-3 py-1 bg-gray-50 rounded-full text-[11.5px] font-medium text-gray-500">{users?.length || 0} total</span>
+    </div>
     <div className="overflow-x-auto custom-scrollbar">
       <table className="w-full text-left">
-        <thead><tr className="bg-slate-50/50 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100"><th className="px-8 py-5">Node Identity</th><th className="px-8 py-5 text-center">Status</th><th className="px-8 py-5 text-right">Console</th></tr></thead>
-        <tbody className="divide-y divide-slate-50">
+        <thead>
+          <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+            <th className="px-6 py-3">Name</th>
+            <th className="px-6 py-3 text-center">Status</th>
+            <th className="px-6 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
           {!users || users.length === 0 ? (
-            <tr><td colSpan="3" className="px-10 py-32 text-center text-slate-200 uppercase font-bold text-[10px] tracking-widest">Repository Empty</td></tr>
+            <tr><td colSpan="3" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">No records yet</td></tr>
           ) : (
             users.map(u => (
-              <tr key={u.uid} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-8 py-5 font-sans"><div className="flex items-center space-x-4 cursor-pointer" onClick={()=>onDetails(u)}><img src={u.profileImage || 'https://via.placeholder.com/32'} className="w-10 h-10 rounded-xl object-cover border-2 border-white shadow-md group-hover:scale-110 transition-transform" /><div><p className="font-bold text-slate-800 text-xs uppercase tracking-tight">{u.name || 'ANONYMOUS'}</p><p className="text-[9px] text-slate-400 font-medium tracking-tighter">{u.phoneNumber}</p></div></div></td>
-                <td className="px-8 py-5 text-center"><span className={`px-4 py-1.5 rounded-full text-[8px] font-bold uppercase border-2 transition-all shadow-sm ${u.isBlocked ? 'bg-red-50 border-red-100 text-red-500' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>{u.isBlocked ? 'SUSPENDED' : 'AUTHORIZED'}</span></td>
-                <td className="px-8 py-5 text-right space-x-2">
-                  <button onClick={()=>onWarn(u)} className="p-3 bg-amber-50 text-amber-500 rounded-xl hover:bg-amber-500 hover:text-white transition-all shadow-sm" title="Warning"><AlertTriangle size={16}/></button>
-                  <button onClick={()=>onWallet(u)} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Wallet"><Wallet size={16}/></button>
-                  <button onClick={()=>onBlock(u)} className={`p-3 rounded-xl transition-all shadow-sm ${u.isBlocked ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-950 hover:text-white'}`} title="Lock"><ShieldAlert size={16}/></button>
-                  <button onClick={()=>onDelete(u)} className="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Purge"><Trash2 size={16}/></button>
+              <tr key={u.uid} className="hover:bg-gray-50/60 transition-colors group">
+                <td className="px-6 py-3.5">
+                  <div className="flex items-center gap-3 cursor-pointer" onClick={()=>onDetails(u)}>
+                    <img src={u.profileImage || 'https://via.placeholder.com/32'} className="w-9 h-9 rounded-full object-cover" />
+                    <div>
+                      <p className="font-semibold text-gray-800 text-[13px]">{u.name || 'Unnamed user'}</p>
+                      <p className="text-[11.5px] text-gray-400">{u.phoneNumber}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-3.5 text-center">
+                  <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${u.isBlocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>{u.isBlocked ? 'Blocked' : 'Active'}</span>
+                </td>
+                <td className="px-6 py-3.5 text-right space-x-1.5">
+                  <button title="Warn" onClick={()=>onWarn(u)} className="p-2 bg-amber-50 text-amber-500 rounded-lg hover:bg-amber-500 hover:text-white transition-colors"><AlertTriangle size={15}/></button>
+                  <button title="Wallet" onClick={()=>onWallet(u)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"><Wallet size={15}/></button>
+                  <button title={u.isBlocked ? 'Unblock' : 'Block'} onClick={()=>onBlock(u)} className={`p-2 rounded-lg transition-colors ${u.isBlocked ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-900 hover:text-white'}`}><ShieldAlert size={15}/></button>
+                  <button title="Delete" onClick={()=>onDelete(u)} className="p-2 bg-red-50 text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-colors"><Trash2 size={15}/></button>
                 </td>
               </tr>
             ))
@@ -359,38 +500,51 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
   </div>
 );
 
+/* ---------- Pending approvals ---------- */
 const PendingView = ({ providers, onApprove }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in duration-300">
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 animate-in fade-in duration-300">
     {providers.length === 0 ? (
-       <div className="col-span-full p-40 bg-white rounded-3xl border-4 border-dashed border-slate-100 text-center text-slate-200 font-bold uppercase text-[10px] tracking-[8px]">All Clear</div>
+      <div className="col-span-full p-20 bg-white rounded-2xl border border-dashed border-gray-200 text-center text-gray-300 font-medium text-[13px]">No pending approvals</div>
     ) : (
       providers.map(p => (
-        <div key={p.uid} className="bg-white p-8 rounded-3xl border border-slate-200 relative group overflow-hidden hover:shadow-2xl transition-all text-center">
-          <button onClick={()=>onApprove(p.uid)} className="absolute top-4 right-4 p-2 bg-indigo-600 text-white rounded-xl shadow-lg font-bold uppercase text-[8px] tracking-widest hover:bg-indigo-700 active:scale-95 transition-all">Verify Node</button>
-          <img src={p.profileImage || 'https://via.placeholder.com/100'} className="w-18 h-18 rounded-2xl object-cover ring-8 ring-slate-50 shadow-2xl mx-auto mb-6 transition-transform group-hover:rotate-6" />
-          <h4 className="font-bold text-sm tracking-tight text-slate-900 uppercase">{p.name}</h4>
-          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-2 mb-8 opacity-60">{p.profession}</p>
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: <span className="text-slate-700 font-black">{p.aadhaarNumber}</span></p><Eye size={18} className="text-indigo-400 cursor-pointer hover:scale-125 transition-all"/></div>
+        <div key={p.uid} className="bg-white p-6 rounded-2xl border border-gray-200 relative hover:shadow-md transition-shadow text-center">
+          <button onClick={()=>onApprove(p.uid)} className="absolute top-3.5 right-3.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-semibold text-[11px] hover:bg-indigo-700 active:scale-95 transition-all">Approve</button>
+          <img src={p.profileImage || 'https://via.placeholder.com/100'} className="w-16 h-16 rounded-2xl object-cover ring-4 ring-gray-50 mx-auto mb-4" />
+          <h4 className="font-semibold text-[14px] text-gray-900">{p.name}</h4>
+          <p className="text-[12px] font-medium text-indigo-500 mt-1 mb-5">{p.profession}</p>
+          <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
+            <p className="text-[11px] font-medium text-gray-400">ID: <span className="text-gray-700 font-semibold">{p.aadhaarNumber}</span></p>
+            <Eye size={16} className="text-indigo-400 cursor-pointer hover:scale-110 transition-transform"/>
+          </div>
         </div>
       ))
     )}
   </div>
 );
 
+/* ---------- Withdrawals ---------- */
 const WithdrawalsTable = ({ withdrawals, onHandle }) => (
-  <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
-    <div className="px-10 py-8 border-b border-slate-100 font-bold text-slate-800 text-[10px] uppercase tracking-[6px] bg-white text-center opacity-30">Liquidation Queue</div>
+  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+    <div className="px-6 py-4 border-b border-gray-100 font-semibold text-gray-900 text-[14px]">Withdrawal requests</div>
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-[11px]">
-        <thead><tr className="bg-slate-50/50 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50"><th className="px-10 py-5">Target Node</th><th className="px-10 py-5 text-right">Authorization</th></tr></thead>
-        <tbody className="divide-y divide-slate-50 font-sans">
+      <table className="w-full text-left">
+        <thead>
+          <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+            <th className="px-6 py-3">Partner</th>
+            <th className="px-6 py-3 text-right">Amount &amp; action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
           {withdrawals.length === 0 ? (
-            <tr><td colSpan="2" className="px-10 py-32 text-center text-slate-200 font-bold uppercase tracking-widest text-[9px]">Awaiting events...</td></tr>
+            <tr><td colSpan="2" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">No pending requests</td></tr>
           ) : (
             withdrawals.map(w => (
-              <tr key={w._id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-10 py-10 font-bold text-slate-900 uppercase tracking-tighter text-2xl leading-none">{w.providerName}</td>
-                <td className="px-10 py-10 text-right space-x-6"><span className="text-indigo-600 font-bold text-4xl mr-10 italic tracking-tighter shadow-indigo-100">₹{w.amount}</span><button onClick={()=>onHandle(w._id, 'approved')} className="px-10 py-4 bg-slate-950 text-white text-[10px] font-bold rounded-[22px] uppercase tracking-[4px] shadow-2xl hover:bg-indigo-600 active:scale-95 transition-all">Execute Transfer</button></td>
+              <tr key={w._id} className="hover:bg-gray-50/60 transition-colors">
+                <td className="px-6 py-5 font-semibold text-gray-900 text-[15px]">{w.providerName}</td>
+                <td className="px-6 py-5 text-right space-x-5">
+                  <span className="text-indigo-600 font-bold text-xl">₹{w.amount}</span>
+                  <button onClick={()=>onHandle(w._id, 'approved')} className="px-5 py-2 bg-gray-900 text-white text-[12px] font-semibold rounded-lg hover:bg-indigo-600 active:scale-95 transition-all">Approve payout</button>
+                </td>
               </tr>
             ))
           )}
@@ -400,20 +554,35 @@ const WithdrawalsTable = ({ withdrawals, onHandle }) => (
   </div>
 );
 
+/* ---------- Jobs / bookings ---------- */
 const JobsTable = ({ jobs, title }) => (
-  <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
-    <div className="px-10 py-6 border-b font-bold uppercase text-[10px] tracking-[8px] bg-white text-slate-800 flex justify-between items-center opacity-40"><span>{title}</span><div className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full font-bold italic tracking-tighter text-[10px]">{jobs?.length || 0} TOTAL</div></div>
+  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+    <div className="px-6 py-4 border-b border-gray-100 font-semibold text-gray-900 text-[14px] flex justify-between items-center">
+      <span>{title}</span>
+      <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full font-medium text-[11.5px]">{jobs?.length || 0} total</span>
+    </div>
     <table className="w-full text-left border-collapse">
-      <thead><tr className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100"><th className="px-10 py-6">Mission Debrief</th><th className="px-10 py-6">State</th><th className="px-10 py-6 text-right">Asset value</th></tr></thead>
-      <tbody className="divide-y divide-slate-50 font-sans text-[13px]">
+      <thead>
+        <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+          <th className="px-6 py-3">Service</th>
+          <th className="px-6 py-3">Status</th>
+          <th className="px-6 py-3 text-right">Amount</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-50">
         {(!jobs || jobs.length === 0) ? (
-          <tr><td colSpan="3" className="px-10 py-40 text-center text-slate-100 font-bold uppercase text-[10px] tracking-[20px]">Registry Null</td></tr>
+          <tr><td colSpan="3" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">Nothing here yet</td></tr>
         ) : (
           jobs.map(j => (
-            <tr key={j._id} className="hover:bg-slate-50/50 transition-colors group">
-              <td className="px-10 py-8"><p className="font-bold text-slate-800 uppercase tracking-tighter text-2xl group-hover:text-indigo-600 transition-colors leading-none">{j.serviceName}</p><p className="text-[9px] font-semibold text-slate-300 mt-2 tracking-widest">{new Date(j.createdAt).toLocaleDateString()}</p></td>
-              <td className="px-10 py-8"><span className={`px-6 py-2.5 rounded-full text-[10px] font-bold uppercase border-2 transition-all shadow-lg ${j.status === 'done' ? 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-emerald-50' : 'bg-indigo-50 border-indigo-100 text-indigo-600 shadow-indigo-50'}`}>{j.status.replace('_',' ')}</span></td>
-              <td className="px-10 py-8 text-right font-bold text-4xl text-slate-950 tracking-tighter group-hover:opacity-100 transition-opacity group-hover:scale-105">₹{j.totalAmount}</td>
+            <tr key={j._id} className="hover:bg-gray-50/60 transition-colors group">
+              <td className="px-6 py-4">
+                <p className="font-semibold text-gray-800 text-[13.5px] group-hover:text-indigo-600 transition-colors">{j.serviceName}</p>
+                <p className="text-[11px] font-medium text-gray-400 mt-0.5">{new Date(j.createdAt).toLocaleDateString()}</p>
+              </td>
+              <td className="px-6 py-4">
+                <span className={`px-3 py-1 rounded-full text-[11px] font-semibold capitalize ${j.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>{j.status.replace('_',' ')}</span>
+              </td>
+              <td className="px-6 py-4 text-right font-bold text-[15px] text-gray-900">₹{j.totalAmount}</td>
             </tr>
           ))
         )}
@@ -422,105 +591,118 @@ const JobsTable = ({ jobs, title }) => (
   </div>
 );
 
+/* ---------- Categories ---------- */
 const CategoriesView = ({ categories, refresh }) => {
   const [n, setN] = useState(''); const [i, setI] = useState('');
-  const handleAdd = () => adminApi.addCategory({name:n, icon:i}).then(()=>{setN('');setI('');refresh();}).catch(()=>showToast('Error', 'error'));
+  const handleAdd = () => adminApi.addCategory({name:n, icon:i}).then(()=>{setN('');setI('');refresh();}).catch(()=>{});
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 animate-in fade-in duration-300">
-      <div className="bg-[#020617] p-12 rounded-[50px] shadow-2xl h-fit border border-white/5 relative overflow-hidden text-center">
-        <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600"></div>
-        <h3 className="font-bold mb-12 uppercase text-[9px] tracking-[6px] text-indigo-500">Boot Category Asset</h3>
-        <div className="space-y-8">
-            <input value={n} onChange={e=>setN(e.target.value)} placeholder="NAME VECTOR" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-black text-white outline-none focus:border-indigo-600 uppercase tracking-widest text-xs shadow-inner" />
-            <input value={i} onChange={e=>setI(e.target.value)} placeholder="URI ASSET" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-bold text-white outline-none focus:border-indigo-600 text-xs shadow-inner" />
-            <button onClick={handleAdd} className="w-full py-8 bg-indigo-600 text-white font-bold rounded-[35px] uppercase text-xs tracking-[8px] shadow-[0_20px_50px_rgba(79,70,229,0.3)] hover:bg-white hover:text-indigo-600 active:scale-95 transition-all">Initialize Deploy</button>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
+      <div className="bg-white p-7 rounded-2xl border border-gray-200 h-fit">
+        <h3 className="font-semibold mb-6 text-[14px] text-gray-900">Add category</h3>
+        <div className="space-y-3">
+          <input value={n} onChange={e=>setN(e.target.value)} placeholder="Category name" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg font-medium outline-none focus:border-indigo-400 text-[13px]" />
+          <input value={i} onChange={e=>setI(e.target.value)} placeholder="Icon URL" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg font-medium outline-none focus:border-indigo-400 text-[13px]" />
+          <button onClick={handleAdd} className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg text-[13px] hover:bg-indigo-700 active:scale-[0.98] transition-all">Add category</button>
         </div>
       </div>
-      <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-8">
+      <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-5">
         {categories.map(c => (
-            <div key={c._id} className="bg-white p-10 rounded-[50px] border border-slate-200 shadow-sm flex flex-col items-center transition-all hover:shadow-2xl hover:scale-105 group relative overflow-hidden">
-                <div className="w-24 h-24 bg-slate-50 rounded-[40px] flex items-center justify-center mb-8 shadow-inner transition-transform group-hover:rotate-12 duration-500"><img src={c.icon || 'https://via.placeholder.com/80'} className="w-16 h-16 object-contain" /></div>
-                <p className="font-bold text-slate-800 uppercase tracking-[4px] text-[11px] text-center leading-relaxed">{c.name}</p>
-                <button onClick={()=>adminApi.deleteCategory(c._id).then(refresh)} className="absolute top-6 right-6 p-3 bg-red-50 text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white shadow-xl"><Trash2 size={16}/></button>
-            </div>
+          <div key={c._id} className="bg-white p-6 rounded-2xl border border-gray-200 flex flex-col items-center hover:shadow-md transition-shadow group relative">
+            <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4"><img src={c.icon || 'https://via.placeholder.com/80'} className="w-10 h-10 object-contain" /></div>
+            <p className="font-semibold text-gray-800 text-[12.5px] text-center">{c.name}</p>
+            <button onClick={()=>adminApi.deleteCategory(c._id).then(refresh)} className="absolute top-3 right-3 p-2 bg-red-50 text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"><Trash2 size={14}/></button>
+          </div>
         ))}
       </div>
     </div>
   );
 };
 
+/* ---------- Offers ---------- */
 const OffersView = ({ offers, refresh }) => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-300">
-        {offers.map(o => (
-            <div key={o._id} className="bg-white p-8 rounded-[45px] border-2 border-dashed border-indigo-100 relative overflow-hidden shadow-sm group hover:border-indigo-500 transition-all text-center">
-                <div className="absolute top-0 right-0 px-6 py-2 bg-indigo-600 text-white font-bold text-[10px] rounded-bl-[25px] uppercase tracking-widest">{o.code}</div>
-                <h4 className="text-4xl font-bold text-indigo-600 mb-2 tracking-tighter">{o.discount}% OFF</h4>
-                <p className="font-bold text-slate-800 uppercase text-xs tracking-tight">{o.title}</p>
-                <p className="text-[10px] text-slate-400 mt-4">Valid till: {new Date(o.expiryDate).toLocaleDateString()}</p>
-                <div className="mt-8 flex justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={()=>adminApi.deleteOffer(o._id).then(refresh)} className="p-4 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={20}/></button>
-                </div>
-            </div>
-        ))}
-        <button className="bg-slate-50 border-4 border-dashed border-white rounded-[45px] p-10 flex flex-col items-center justify-center text-slate-200 hover:text-indigo-400 hover:border-indigo-100 transition-all shadow-inner">
-            <Plus size={40} strokeWidth={3} />
-            <span className="font-bold text-[10px] uppercase mt-4 tracking-[4px]">Generate Promo</span>
-        </button>
-    </div>
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 animate-in fade-in duration-300">
+    {offers.map(o => (
+      <div key={o._id} className="bg-white p-6 rounded-2xl border border-gray-200 relative group hover:shadow-md transition-shadow text-center">
+        <div className="absolute top-0 right-0 px-4 py-1.5 bg-indigo-600 text-white font-semibold text-[10.5px] rounded-bl-xl rounded-tr-2xl">{o.code}</div>
+        <h4 className="text-3xl font-bold text-indigo-600 mb-1 mt-3">{o.discount}% off</h4>
+        <p className="font-semibold text-gray-800 text-[13px]">{o.title}</p>
+        <p className="text-[11.5px] text-gray-400 mt-3">Expires {new Date(o.expiryDate).toLocaleDateString()}</p>
+        <div className="mt-5 flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={()=>adminApi.deleteOffer(o._id).then(refresh)} className="p-2.5 bg-red-50 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><Trash2 size={16}/></button>
+        </div>
+      </div>
+    ))}
+    <button className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center text-gray-300 hover:text-indigo-400 hover:border-indigo-200 transition-colors">
+      <Plus size={28} strokeWidth={2.5} />
+      <span className="font-semibold text-[12px] mt-2.5">New offer</span>
+    </button>
+  </div>
 );
 
+/* ---------- Banners ---------- */
 const BannersView = ({ banners, refresh }) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-300">
-        {banners.map(b => (
-            <div key={b._id} className="bg-white rounded-[50px] border border-slate-100 overflow-hidden shadow-sm group hover:shadow-2xl transition-all duration-700 relative">
-                <img src={b.image} className="h-56 w-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                <div className="p-8 bg-white relative z-10">
-                    <h4 className="font-bold text-slate-900 text-lg uppercase tracking-tight">{b.title}</h4>
-                    <p className="text-slate-400 font-medium text-xs mt-2 opacity-70">{b.subtitle}</p>
-                    <button onClick={()=>adminApi.deleteBanner(b._id).then(refresh)} className="absolute top-8 right-8 p-4 bg-red-50 text-red-400 rounded-3xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white shadow-xl"><Trash2 size={20}/></button>
-                </div>
-            </div>
-        ))}
-        <button className="bg-indigo-600 rounded-[50px] h-full min-h-[300px] flex flex-col items-center justify-center text-white shadow-[0_30px_100px_rgba(79,70,229,0.4)] hover:scale-[1.02] transition-all duration-500 group">
-            <div className="p-8 bg-white/10 rounded-full border border-white/20 group-hover:rotate-90 transition-transform duration-700"><Plus size={48} strokeWidth={3}/></div>
-            <span className="font-bold text-[11px] uppercase mt-6 tracking-[8px]">Deploy Media Asset</span>
-        </button>
-    </div>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-300">
+    {banners.map(b => (
+      <div key={b._id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden group hover:shadow-md transition-shadow relative">
+        <img src={b.image} className="h-48 w-full object-cover" />
+        <div className="p-5">
+          <h4 className="font-semibold text-gray-900 text-[14px]">{b.title}</h4>
+          <p className="text-gray-500 text-[12.5px] mt-1">{b.subtitle}</p>
+          <button onClick={()=>adminApi.deleteBanner(b._id).then(refresh)} className="absolute top-4 right-4 p-2.5 bg-white text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white shadow-md"><Trash2 size={16}/></button>
+        </div>
+      </div>
+    ))}
+    <button className="bg-indigo-600 rounded-2xl min-h-[220px] flex flex-col items-center justify-center text-white hover:bg-indigo-500 transition-colors">
+      <div className="p-5 bg-white/10 rounded-full"><Plus size={28} strokeWidth={2.5}/></div>
+      <span className="font-semibold text-[12.5px] mt-4">Add banner</span>
+    </button>
+  </div>
 );
 
+/* ---------- Reports ---------- */
 const ReportsView = ({ reports }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-300">
-    {reports.length === 0 ? <div className="col-span-full p-60 bg-white rounded-[70px] border-4 border-dashed border-slate-100 text-center text-slate-100 font-bold uppercase text-3xl tracking-[30px]">STATUS NOMINAL</div> : reports.map(r => (
-      <div key={r._id} className="bg-white p-12 rounded-[60px] border-l-[20px] border-red-500 shadow-2xl relative overflow-hidden group hover:shadow-red-100 transition-all duration-500">
-        <div className="absolute top-0 right-0 px-8 py-3 bg-red-600 text-white text-[9px] font-bold uppercase rounded-bl-[35px] tracking-[4px] shadow-2xl">{r.status}</div>
-        <h4 className="font-bold text-slate-900 uppercase text-2xl tracking-tighter mb-8">Incident: {r.reason}</h4>
-        <div className="bg-slate-50 p-8 rounded-[40px] shadow-inner mb-12 border border-slate-100 font-bold text-slate-500 opacity-90 text-sm leading-relaxed">"{r.description}"</div>
-        <div className="flex gap-4 overflow-x-auto pb-6 custom-scrollbar scroll-smooth">
-            {r.evidenceUrls?.map((u, i) => (
-                <img key={i} src={u} className="w-28 h-28 rounded-[45px] border-[10px] border-white object-cover shadow-2xl transition-all hover:scale-110 flex-shrink-0 cursor-zoom-in" />
-            ))}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-300">
+    {reports.length === 0 ? (
+      <div className="col-span-full p-20 bg-white rounded-2xl border border-dashed border-gray-200 text-center text-gray-300 font-medium text-[13px]">No open reports</div>
+    ) : reports.map(r => (
+      <div key={r._id} className="bg-white p-7 rounded-2xl border-l-4 border-red-500 border border-gray-200 relative">
+        <span className="absolute top-4 right-4 px-3 py-1 bg-red-50 text-red-600 text-[10.5px] font-semibold rounded-full capitalize">{r.status}</span>
+        <h4 className="font-semibold text-gray-900 text-[15px] mb-4 pr-20">{r.reason}</h4>
+        <div className="bg-gray-50 p-4 rounded-xl mb-5 border border-gray-100 text-gray-600 text-[12.5px] leading-relaxed">{r.description}</div>
+        <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+          {r.evidenceUrls?.map((u, i) => (
+            <img key={i} src={u} className="w-20 h-20 rounded-xl border border-gray-100 object-cover flex-shrink-0 cursor-zoom-in hover:scale-105 transition-transform" />
+          ))}
         </div>
       </div>
     ))}
   </div>
 );
 
+/* ---------- Reviews ---------- */
 const ReviewsView = ({ reviews, onDelete }) => (
-  <div className="bg-white rounded-[60px] border border-slate-100 shadow-sm overflow-hidden text-left animate-in fade-in duration-300">
-    <div className="px-12 py-12 border-b border-slate-50 bg-white font-bold text-slate-800 text-[10px] uppercase tracking-[15px] text-center opacity-30">Intelligence Sentiment Registry</div>
+  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+    <div className="px-6 py-4 border-b border-gray-100 font-semibold text-gray-900 text-[14px]">Customer reviews</div>
     <div className="overflow-x-auto">
       <table className="w-full">
-        <thead><tr className="bg-slate-50/50 text-[9px] font-bold text-slate-400 uppercase tracking-[6px] border-b border-slate-50 font-sans"><th className="px-12 py-8">Review Authority</th><th className="px-12 py-8 text-left">Analytical Debrief</th><th className="px-12 py-8 text-right">System Control</th></tr></thead>
-        <tbody className="divide-y divide-slate-50 font-sans">
+        <thead>
+          <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+            <th className="px-6 py-3 text-left">Customer</th>
+            <th className="px-6 py-3 text-left">Review</th>
+            <th className="px-6 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
           {reviews.map(r => (
-            <tr key={r._id} className="hover:bg-slate-50/50 transition-all group">
-              <td className="px-12 py-12 font-bold text-slate-900 uppercase tracking-tighter text-4xl leading-none">{r.customerName}
-                  <div className="flex gap-1.5 mt-6">
-                      {[...Array(5)].map((_, i) => <Star key={i} size={18} className={i < r.rating ? 'text-amber-400 fill-amber-400 drop-shadow-2xl' : 'text-slate-100'} />)}
-                  </div>
+            <tr key={r._id} className="hover:bg-gray-50/60 transition-colors group">
+              <td className="px-6 py-5 align-top">
+                <p className="font-semibold text-gray-900 text-[13.5px]">{r.customerName}</p>
+                <div className="flex gap-0.5 mt-1.5">
+                  {[...Array(5)].map((_, i) => <Star key={i} size={13} className={i < r.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200'} />)}
+                </div>
               </td>
-              <td className="px-12 py-12"><div className="p-10 bg-slate-50 rounded-[45px] border border-slate-200 shadow-inner font-bold text-slate-500 text-xl leading-relaxed group-hover:bg-white transition-colors duration-300">"{r.comment}"</div></td>
-              <td className="px-12 py-12 text-right"><button onClick={()=>onDelete(r._id)} className="p-8 bg-red-50 text-red-400 rounded-[45px] hover:bg-red-600 hover:text-white transition-all shadow-xl active:scale-90 duration-300"><Trash2 size={32}/></button></td>
+              <td className="px-6 py-5 align-top"><p className="text-gray-600 text-[13px] leading-relaxed max-w-md">{r.comment}</p></td>
+              <td className="px-6 py-5 text-right align-top"><button onClick={()=>onDelete(r._id)} className="p-2 bg-red-50 text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-colors"><Trash2 size={15}/></button></td>
             </tr>
           ))}
         </tbody>
@@ -529,43 +711,31 @@ const ReviewsView = ({ reviews, onDelete }) => (
   </div>
 );
 
+/* ---------- Settings ---------- */
 const SettingsView = ({ settings, refresh }) => {
   const [c, setC] = useState(settings.commission_percentage || 15);
   return (
-    <div className="bg-[#020617] p-20 rounded-[80px] border-[12px] border-white/5 max-w-4xl shadow-[0_80px_200px_-50px_rgba(0,0,0,1)] relative overflow-hidden group animate-in fade-in duration-500 mx-auto">
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full -mr-[250px] -mt-[250px] blur-[150px] group-hover:bg-indigo-500/10 transition-all duration-1000"></div>
-      <h3 className="font-bold uppercase text-[11px] tracking-[15px] mb-20 text-indigo-500 text-center">Global Logic Core</h3>
-      <div className="flex justify-between items-center mb-20 relative z-10 text-white uppercase font-bold text-5xl tracking-tighter">
-          <div className="space-y-6"><p className="leading-none tracking-tight">Revenue Friction</p><p className="text-slate-600 text-sm font-bold tracking-[4px] normal-case opacity-80 leading-relaxed border-l-4 border-indigo-600 pl-8 text-left">The coefficient determining platform retainment unit factor.</p></div>
-          <div className="flex items-center space-x-8 bg-white/5 p-12 rounded-[60px] border-2 border-white/10 shadow-[0_30px_100px_rgba(0,0,0,0.4)] hover:border-indigo-600/30 transition-all duration-500 group/input">
-              <input type="number" value={c} onChange={e=>setC(e.target.value)} className="w-40 h-40 text-center bg-transparent font-bold text-8xl text-indigo-500 outline-none placeholder-indigo-900 group-hover/input:scale-110 transition-transform duration-500" />
-              <span className="font-bold text-white/5 text-[140px] select-none leading-none opacity-10">%</span>
-          </div>
+    <div className="bg-white p-10 rounded-2xl border border-gray-200 max-w-xl mx-auto animate-in fade-in duration-300">
+      <h3 className="font-semibold text-[15px] text-gray-900 mb-8">Platform settings</h3>
+      <div className="flex justify-between items-center gap-8 mb-8">
+        <div>
+          <p className="font-medium text-gray-800 text-[13.5px]">Commission rate</p>
+          <p className="text-gray-400 text-[12px] mt-1 leading-relaxed">Percentage the platform keeps from every completed job</p>
+        </div>
+        <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl px-3">
+          <input type="number" value={c} onChange={e=>setC(e.target.value)} className="w-16 py-3 text-center bg-transparent font-bold text-xl text-indigo-600 outline-none" />
+          <span className="font-semibold text-gray-400 text-lg">%</span>
+        </div>
       </div>
-      <button onClick={()=>adminApi.updateSetting('commission_percentage', c).then(()=>showToast('Engine Synced'))} className="w-full py-10 bg-indigo-600 text-white font-bold rounded-[45px] uppercase text-sm tracking-[12px] shadow-[0_40px_100px_rgba(79,70,229,0.4)] hover:bg-white hover:text-indigo-600 active:scale-95 transition-all duration-500 relative z-10">SYNCHRONIZE UNIVERSAL ENGINE</button>
+      <button onClick={()=>adminApi.updateSetting('commission_percentage', c).then(refresh)} className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl text-[13.5px] hover:bg-indigo-700 active:scale-[0.98] transition-all">Save changes</button>
     </div>
   );
 };
 
+/* ---------- Support ---------- */
 const SupportView = ({ chats }) => (
-  <div className="bg-white rounded-[70px] border border-slate-100 h-[700px] flex items-center justify-center text-slate-100 font-bold uppercase tracking-[40px] text-center px-12 leading-relaxed opacity-20">BRIDGE_OFFLINE</div>
-);
-
-const SummaryCard = ({ label, value, sub, color="text-slate-900" }) => (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-[170px] text-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 opacity-60">{label}</p><div className="flex flex-col items-center"><p className={`text-2xl font-bold tracking-tight ${color}`}>{value}</p><p className="text-[9px] font-semibold text-slate-300 uppercase mt-1.5">{sub}</p></div></div>
-);
-
-const StatusPill = ({ color, label, count }) => (
-    <div className="px-4 py-2 bg-white border border-slate-200 rounded-full shadow-sm flex items-center gap-3"><div className={`w-1.5 h-1.5 rounded-full ${color}`}></div><span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{label}</span><span className="text-xs font-bold text-slate-900">{count}</span></div>
-);
-
-const Legend = ({ color, label }) => (
-    <div className="flex items-center gap-2.5"><div className={`w-3 h-3 rounded-full ${color}`}></div><span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">{label}</span></div>
-);
-
-const StatCard = ({ title, value, color }) => (
-  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all">
-    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 opacity-60">{title}</p>
-    <p className={`text-2xl font-bold tracking-tighter ${color}`}>{value || 0}</p>
+  <div className="bg-white rounded-2xl border border-gray-200 h-[600px] flex flex-col items-center justify-center text-gray-300 gap-3">
+    <MessageSquare size={32} strokeWidth={1.5} />
+    <p className="font-medium text-[13px]">Support chat isn't connected yet</p>
   </div>
 );
