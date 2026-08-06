@@ -25,20 +25,76 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       switch(tab) {
-        case 'analytics': setData(p => ({...p, analytics: (await adminApi.getAnalytics()).data})); break;
-        case 'providers-pending': setData(p => ({...p, pendingProviders: (await adminApi.getPendingProviders()).data})); break;
-        case 'customers': setData(p => ({...p, allUsers: (await adminApi.getAllUsers()).data})); break;
-        case 'providers-all': setData(p => ({...p, allProviders: (await adminApi.getAllProviders()).data})); break;
-        case 'withdrawals': setData(p => ({...p, withdrawals: (await adminApi.getPendingWithdrawals()).data})); break;
-        case 'jobs': setData(p => ({...p, activeJobs: (await adminApi.getActiveJobs()).data})); break;
-        case 'bookings-all': setData(p => ({...p, allBookings: (await adminApi.getAllBookings()).data})); break;
-        case 'categories': setData(p => ({...p, categories: (await adminApi.getCategories()).data})); break;
-        case 'offers': setData(p => ({...p, offers: (await adminApi.getOffers()).data})); break;
-        case 'banners': setData(p => ({...p, banners: (await adminApi.getBanners()).data})); break;
-        case 'settings': setData(p => ({...p, settings: (await adminApi.getSettings()).data})); break;
-        case 'support': setData(p => ({...p, chats: (await adminApi.getSupportChats()).data})); break;
-        case 'reports': setData(p => ({...p, reports: (await adminApi.getReports()).data})); break;
-        case 'reviews': setData(p => ({...p, reviews: (await adminApi.getAllReviews()).data})); break;
+        case 'analytics': {
+          const res = await adminApi.getAnalytics();
+          setData(p => ({...p, analytics: res.data}));
+          break;
+        }
+        case 'providers-pending': {
+          const res = await adminApi.getPendingProviders();
+          setData(p => ({...p, pendingProviders: res.data}));
+          break;
+        }
+        case 'customers': {
+          const res = await adminApi.getAllUsers();
+          setData(p => ({...p, allUsers: res.data}));
+          break;
+        }
+        case 'providers-all': {
+          const res = await adminApi.getAllProviders();
+          setData(p => ({...p, allProviders: res.data}));
+          break;
+        }
+        case 'withdrawals': {
+          const res = await adminApi.getPendingWithdrawals();
+          setData(p => ({...p, withdrawals: res.data}));
+          break;
+        }
+        case 'jobs': {
+          const res = await adminApi.getActiveJobs();
+          setData(p => ({...p, activeJobs: res.data}));
+          break;
+        }
+        case 'bookings-all': {
+          const res = await adminApi.getAllBookings();
+          setData(p => ({...p, allBookings: res.data}));
+          break;
+        }
+        case 'categories': {
+          const res = await adminApi.getCategories();
+          setData(p => ({...p, categories: res.data}));
+          break;
+        }
+        case 'offers': {
+          const res = await adminApi.getOffers();
+          setData(p => ({...p, offers: res.data}));
+          break;
+        }
+        case 'banners': {
+          const res = await adminApi.getBanners();
+          setData(p => ({...p, banners: res.data}));
+          break;
+        }
+        case 'settings': {
+          const res = await adminApi.getSettings();
+          setData(p => ({...p, settings: res.data}));
+          break;
+        }
+        case 'support': {
+          const res = await adminApi.getSupportChats();
+          setData(p => ({...p, chats: res.data}));
+          break;
+        }
+        case 'reports': {
+          const res = await adminApi.getReports();
+          setData(p => ({...p, reports: res.data}));
+          break;
+        }
+        case 'reviews': {
+          const res = await adminApi.getAllReviews();
+          setData(p => ({...p, reviews: res.data}));
+          break;
+        }
       }
     } catch (err) { console.error(err); }
     setLoading(false);
