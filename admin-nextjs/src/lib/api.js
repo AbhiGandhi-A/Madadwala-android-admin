@@ -9,10 +9,14 @@ const api = axios.create({
 export const adminApi = {
   getAnalytics: () => api.get('/admin/analytics'),
   getPendingProviders: () => api.get('/admin/pending-providers'),
+  getAllProviders: () => api.get('/admin/providers-all'),
+  getAllUsers: () => api.get('/admin/users'),
+  toggleBlock: (uid) => api.patch(`/admin/users/${uid}/toggle-block`),
   approveProvider: (uid) => api.post('/admin/approve-provider', { uid }),
   getPendingWithdrawals: () => api.get('/admin/withdrawals/pending'),
   updateWithdrawal: (id, data) => api.patch(`/admin/withdrawals/${id}`, data),
   getActiveJobs: () => api.get('/admin/active-jobs'),
+  getAllBookings: () => api.get('/admin/all-bookings'),
   getCategories: () => api.get('/categories'),
   addCategory: (data) => api.post('/admin/categories', data),
   deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
@@ -30,6 +34,7 @@ export const adminApi = {
   getSupportChats: () => api.get('/admin/support/chats'),
   getChatMessages: (userId) => api.get(`/support/messages/${userId}`),
   sendSupportMessage: (data) => api.post('/support/messages', data),
+  getReports: () => api.get('/admin/reports'),
 };
 
 export default api;
