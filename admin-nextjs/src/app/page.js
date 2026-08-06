@@ -9,6 +9,13 @@ import {
   Activity, Zap, MapPin, Navigation, Info, RefreshCw, Maximize2, Phone, ExternalLink
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
+import dynamic from 'next/dynamic';
+
+// Dynamic import for Leaflet map to avoid SSR issues in Next.js
+const MapComponent = dynamic(() => import('@/components/MapComponent'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-slate-100 flex items-center justify-center font-black text-slate-300 uppercase tracking-[4px] italic animate-pulse">Initializing Satellite Grid...</div>
+});
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('monitor');
@@ -39,7 +46,11 @@ export default function AdminDashboard() {
       let res;
       switch(tab) {
         case 'analytics': res = await adminApi.getAnalytics(); setData(p => ({...p, analytics: res.data})); break;
-        case 'monitor': res = await adminApi.getMonitor(); setData(p => ({...p, monitor: res.data})); if(res.data.length > 0 && !selectedPartner) setSelectedPartner(res.data[0]); break;
+        case 'monitor':
+          res = await adminApi.getMonitor();
+          setData(p => ({...p, monitor: res.data}));
+          if(res.data.length > 0 && !selectedPartner) setSelectedPartner(res.data[0]);
+          break;
         case 'providers-pending': res = await adminApi.getPendingProviders(); setData(p => ({...p, pendingProviders: res.data})); break;
         case 'customers': res = await adminApi.getAllUsers(); setData(p => ({...p, allUsers: res.data})); break;
         case 'providers-all': res = await adminApi.getAllProviders(); setData(p => ({...p, allProviders: res.data})); break;
@@ -86,7 +97,7 @@ export default function AdminDashboard() {
         <div className="p-8 border-b border-white/5 font-black text-2xl tracking-tighter uppercase italic">MADADWALA</div>
         <nav className="flex-1 px-4 py-8 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon={<Activity size={18}/>} label="Mission Control" active={activeTab==='monitor'} onClick={()=>setActiveTab('monitor')} />
-          <NavItem icon={<BarChart3 size={18}/>} label="Global Analytics" active={activeTab==='analytics'} onClick={()=>setActiveTab('analytics')} />
+          <NavItem icon={<BarChart3 size={18}/>} label="Global Analytics" active={activeTab==='analytics'} onClick={()=>setActiveTab('analytics')} pulse />
           <div className="pt-8 pb-2 px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Management</div>
           <NavItem icon={<Users size={18}/>} label="Consumers" active={activeTab==='customers'} onClick={()=>setActiveTab('customers')} />
           <NavItem icon={<UserCheck size={18}/>} label="Partners" active={activeTab==='providers-all'} onClick={()=>setActiveTab('providers-all')} />
@@ -104,7 +115,7 @@ export default function AdminDashboard() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-10 shrink-0 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-10 shrink-0 z-10">
           <h2 className="text-[10px] font-black text-slate-900 tracking-[3px] uppercase italic">{activeTab.replace('-', ' ')}</h2>
           <div className="w-10 h-10 rounded-xl bg-slate-900 border-4 border-slate-50 flex items-center justify-center text-white font-black">A</div>
         </header>
@@ -134,7 +145,6 @@ export default function AdminDashboard() {
         </main>
       </div>
 
-      {/* Slide-over Panel */}
       {activeModal && (
           <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
               <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={()=>setActiveModal(null)}></div>
@@ -162,7 +172,7 @@ export default function AdminDashboard() {
                           <div className="space-y-10">
                               <div className="flex gap-4">
                                   <button onClick={()=>setFormState({...formState, type: 'credit'})} className={`flex-1 py-6 rounded-[24px] font-black uppercase text-xs tracking-widest border-2 transition-all ${formState.type === 'credit' ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-50 border-transparent text-slate-300'}`}>Inject (+)</button>
-                                  <button onClick={()=>setFormState({...formState, type: 'debit'})} className={`flex-1 py-6 rounded-[24px] font-black uppercase text-xs tracking-widest border-2 transition-all ${formState.type === 'debit' ? 'bg-red-500 border-red-500 text-white' : 'bg-slate-50 border-transparent text-slate-300'}`}>Extract (-)</button>
+                                  <button onClick={()=>setFormState({...formState, type: 'debit'})} className={`flex-1 py-6 rounded-[24px] font-black uppercase text-xs tracking-widest border-2 transition-all ${formState.type === 'debit' ? 'bg-red-50 border-red-100 text-white' : 'bg-slate-50 border-transparent text-slate-300'}`}>Extract (-)</button>
                               </div>
                               <input type="number" value={formState.amount} onChange={e=>setFormState({...formState, amount: e.target.value})} placeholder="₹ 0.00" className="w-full p-8 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-[32px] outline-none font-black text-5xl tracking-tighter shadow-inner italic" />
                               <input value={formState.description} onChange={e=>setFormState({...formState, description: e.target.value})} placeholder="Reason Note" className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-bold shadow-inner" />
@@ -187,7 +197,7 @@ export default function AdminDashboard() {
                                       {selectedUser.activityLog?.slice(-10).reverse().map((log, i) => (
                                           <div key={i} className="p-5 bg-white border border-slate-100 rounded-[22px] shadow-sm flex items-start gap-4">
                                               <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></div>
-                                              <div><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-indigo-600 uppercase italic">{log.event}</span><span className="text-[9px] text-slate-300 font-bold">{new Date(log.timestamp).toLocaleTimeString()}</span></div><p className="text-xs text-slate-500 font-medium italic">"{log.description}"</p></div>
+                                              <div><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-indigo-600 uppercase italic">{log.event}</span><span className="text-[9px] font-bold text-slate-300">{new Date(log.timestamp).toLocaleTimeString()}</span></div><p className="text-xs text-slate-500 font-medium italic">"{log.description}"</p></div>
                                           </div>
                                       ))}
                                   </div>
@@ -197,7 +207,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="p-10 border-t border-slate-50 bg-white">
                       {activeModal !== 'details' ? (
-                          <button onClick={handleAction} className={`w-full py-6 rounded-[28px] font-black uppercase text-xs tracking-[5px] shadow-2xl transition-all ${activeModal === 'delete' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'}`}>Confirm {activeModal}</button>
+                          <button onClick={handleAction} className={`w-full py-6 rounded-[28px] font-black uppercase text-xs tracking-[5px] shadow-2xl transition-all hover:-translate-y-1 active:scale-95 ${activeModal === 'delete' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'}`}>Confirm {activeModal}</button>
                       ) : (
                           <button onClick={()=>setActiveModal(null)} className="w-full py-6 bg-slate-50 text-slate-400 rounded-[28px] font-black uppercase text-xs tracking-[5px] hover:bg-slate-100">Dismiss Panel</button>
                       )}
@@ -209,10 +219,13 @@ export default function AdminDashboard() {
   );
 }
 
-function NavItem({ icon, label, active, onClick, count }) {
+function NavItem({ icon, label, active, onClick, count, pulse }) {
   return (
     <button onClick={onClick} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl transition-colors duration-100 ${active ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-      <div className="flex items-center space-x-3">{icon}<span className="font-bold text-sm tracking-tight">{label}</span></div>
+      <div className="flex items-center space-x-3">
+        {pulse && !active && <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping absolute -ml-1 mt-1"></div>}
+        {icon}<span className="font-bold text-sm tracking-tight">{label}</span>
+      </div>
       {count > 0 && <span className={`px-2 py-0.5 text-[9px] font-black rounded-lg ${active ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'}`}>{count}</span>}
     </button>
   );
@@ -273,16 +286,17 @@ const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner }) =
             </div>
 
             <div className="flex-1 bg-white rounded-[45px] relative overflow-hidden border-8 border-white shadow-2xl">
-                <div className="absolute inset-0 bg-slate-100 bg-[url('https://api.mapbox.com/styles/v1/mapbox/light-v10/static/72.83,21.17,12/1200x800?access_token=none')] bg-cover opacity-60"></div>
-                <div className="absolute top-8 right-8 flex flex-col gap-4">
+                <div className="absolute inset-0 z-0">
+                    <MapComponent partners={data} selectedPartner={selectedPartner} />
+                </div>
+                <div className="absolute top-8 right-8 flex flex-col gap-4 z-10">
                     <button onClick={onRefresh} className="px-6 py-3 bg-white shadow-2xl rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all"><RefreshCw size={16}/> Refresh</button>
                     <button className="p-3 bg-white shadow-2xl rounded-2xl hover:scale-105 transition-all"><Maximize2 size={18}/></button>
                 </div>
-                <div className="absolute bottom-10 right-8 flex flex-col gap-3">
-                    <div className="bg-white shadow-2xl rounded-[20px] flex flex-col"><button className="p-4 border-b border-slate-50 text-slate-400 hover:text-indigo-600 text-xl font-black">+</button><button className="p-4 text-slate-400 hover:text-indigo-600 text-xl font-black">-</button></div>
-                    <button className="p-4 bg-white shadow-2xl rounded-[20px] text-slate-400 hover:text-indigo-600"><Navigation size={22}/></button>
+                <div className="absolute bottom-10 right-8 flex flex-col gap-3 z-10">
+                    <button className="p-4 bg-white shadow-2xl rounded-[20px] text-slate-400 hover:text-indigo-600 transition-all active:scale-95"><Navigation size={22}/></button>
                 </div>
-                <div className="absolute bottom-10 left-10 p-5 bg-white/90 backdrop-blur-md rounded-[30px] shadow-2xl flex gap-8 border border-white/50">
+                <div className="absolute bottom-10 left-10 p-5 bg-white/90 backdrop-blur-md rounded-[30px] shadow-2xl flex gap-8 border border-white/50 z-10">
                     <Legend color="bg-emerald-500" label="Online" /><Legend color="bg-indigo-600" label="Busy" /><Legend color="bg-sky-500" label="Arrived" /><Legend color="bg-slate-200" label="Offline" />
                 </div>
             </div>
@@ -296,9 +310,9 @@ const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner }) =
                 </div>
                 <div className="h-20 w-px bg-slate-100"></div>
                 <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3 italic">Current Job</p><p className="font-black text-slate-800 text-sm">#BK-2026-0804-0567</p><p className="text-xs font-bold text-slate-500 mt-1 italic">Light Fitting at Adajan</p><button className="text-[10px] font-black text-indigo-600 mt-3 flex items-center gap-1 uppercase underline underline-offset-4">View Details</button></div>
-                <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3 italic">Location</p><p className="font-black text-slate-800 text-sm tracking-widest">21.1950, 72.8311</p><p className="text-xs font-bold text-slate-500 mt-1 italic uppercase tracking-tighter text-emerald-500">0.5 km from job location</p></div>
-                <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3 italic">Update Pulse</p><p className="font-black text-slate-800 text-sm italic">2 mins ago</p><p className="text-xs font-bold text-slate-500 mt-1 italic opacity-40">16 Aug 2026, 04:34 PM</p></div>
-                <div className="flex flex-col gap-2"><button className="px-10 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-[22px] font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3 border border-indigo-100"><MapPin size={16}/> View Map</button><button className="px-10 py-3 bg-white hover:bg-slate-900 hover:text-white text-slate-800 border-2 border-slate-100 rounded-[22px] font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3"><Phone size={16}/> Contact</button></div>
+                <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3 italic">Location</p><p className="font-black text-slate-800 text-sm tracking-widest">{selectedPartner.lat?.toFixed(4) || '21.1702'}, {selectedPartner.lng?.toFixed(4) || '72.8311'}</p><p className="text-xs font-bold text-slate-500 mt-1 italic uppercase tracking-tighter text-emerald-500">0.5 km from job location</p></div>
+                <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3 italic">Update Pulse</p><p className="font-black text-slate-800 text-sm italic">Live</p><p className="text-xs font-bold text-slate-500 mt-1 italic opacity-40">Just now</p></div>
+                <div className="flex flex-col gap-2"><button className="px-10 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-[22px] font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3 border border-indigo-100"><MapPin size={16}/> View Map</button><button className="px-10 py-3 bg-white hover:bg-slate-900 hover:text-white text-slate-800 border-2 border-slate-100 rounded-[22px] font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-3"><Phone size={16}/> Contact</button></div>
             </div>
         )}
     </div>
@@ -316,7 +330,7 @@ const Legend = ({ color, label }) => (
 const AnalyticsView = ({ data }) => !data ? null : (
   <div className="space-y-12 animate-in fade-in duration-200">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-        <StatCard title="Total Consumers" value={data.totalUsers} color="text-indigo-600" />
+        <StatCard title="Global Consumers" value={data.totalUsers} color="text-indigo-600" />
         <StatCard title="Active Partners" value={data.totalProviders} color="text-emerald-600" />
         <StatCard title="Total Revenue" value={`₹${data.totalRevenue?.toLocaleString()}`} color="text-slate-900" />
         <StatCard title="Ops Completed" value={data.totalBookings} color="text-blue-600" />
@@ -397,7 +411,7 @@ const WithdrawalsTable = ({ withdrawals, onHandle }) => (
         <thead><tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[4px]"><th className="px-12 py-8">Account Identity</th><th className="px-12 py-8 text-right">Liquidation Status</th></tr></thead>
         <tbody className="divide-y divide-slate-50">
           {withdrawals.length === 0 ? (
-            <tr><td colSpan="2" className="px-10 py-32 text-center text-slate-200 italic font-black uppercase tracking-[10px] text-xs">Waiting for events</td></tr>
+            <tr><td colSpan="2" className="px-10 py-32 text-center text-slate-200 italic font-black uppercase tracking-[10px] text-xs animate-pulse">Waiting for Liquidation Events</td></tr>
           ) : (
             withdrawals.map(w => (
               <tr key={w._id} className="hover:bg-slate-50/50 transition-colors">
@@ -442,9 +456,9 @@ const CategoriesView = ({ categories, refresh }) => {
       <div className="bg-[#0F172A] p-12 rounded-[50px] shadow-2xl h-fit border border-white/5 relative overflow-hidden text-center">
         <h3 className="font-black mb-12 uppercase text-[10px] tracking-[6px] text-indigo-400 italic">Core Asset Setup</h3>
         <div className="space-y-8">
-            <input value={n} onChange={e=>setN(e.target.value)} placeholder="VECTOR_NAME" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-black text-white outline-none focus:border-indigo-500 uppercase tracking-widest text-xs" />
-            <input value={i} onChange={e=>setI(e.target.value)} placeholder="URI_LOCATION" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-bold text-white outline-none focus:border-indigo-500 text-xs" />
-            <button onClick={handleAdd} className="w-full py-7 bg-indigo-600 text-white font-black rounded-[35px] uppercase text-xs tracking-[8px] shadow-2xl shadow-indigo-900/50 hover:bg-white hover:text-indigo-600 transition-all">Deploy Module</button>
+            <input value={n} onChange={e=>setN(e.target.value)} placeholder="VECTOR_NAME" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-black text-white outline-none focus:border-indigo-500 uppercase tracking-widest text-xs shadow-inner" />
+            <input value={i} onChange={e=>setI(e.target.value)} placeholder="URI_LOCATION" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-bold text-white outline-none focus:border-indigo-500 text-xs shadow-inner" />
+            <button onClick={handleAdd} className="w-full py-7 bg-indigo-600 text-white font-black rounded-[35px] uppercase text-xs tracking-[8px] shadow-2xl shadow-indigo-900/50 hover:bg-white hover:text-indigo-600 transition-all active:scale-95">Deploy Module</button>
         </div>
       </div>
       <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-8">
@@ -506,7 +520,7 @@ const SettingsView = ({ settings, refresh }) => {
   return (
     <div className="bg-[#0F172A] p-20 rounded-[80px] border-[12px] border-white/5 max-w-4xl shadow-[0_80px_200px_-50px_rgba(0,0,0,0.6)] relative overflow-hidden group animate-in fade-in duration-200 mx-auto">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full -mr-[250px] -mt-[250px] blur-[150px] group-hover:bg-indigo-500/10 transition-all duration-1000"></div>
-      <h3 className="font-black uppercase text-[11px] tracking-[15px] mb-20 text-indigo-500 italic text-center">Global Platform Logic Core</h3>
+      <h3 className="font-black uppercase text-[11px] tracking-[15px] mb-20 text-indigo-500 italic text-center">Central Logic Core</h3>
       <div className="flex justify-between items-center mb-20 relative z-10 text-white uppercase font-black text-5xl tracking-tighter italic">
           <div className="space-y-4"><p className="leading-none">Revenue Friction</p><p className="text-slate-600 text-sm font-black tracking-[4px] normal-case opacity-80 leading-relaxed border-l-4 border-indigo-600 pl-6 text-left">Platform retainment factor per transaction node.</p></div>
           <div className="flex items-center space-x-8 bg-white/5 p-12 rounded-[60px] border-2 border-white/10 shadow-[0_30px_100px_rgba(0,0,0,0.4)] hover:border-indigo-500/30 transition-all duration-500 group/input">
