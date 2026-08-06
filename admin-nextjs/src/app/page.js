@@ -287,7 +287,7 @@ const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner }) =
 
             <div className="flex-1 bg-white rounded-[45px] relative overflow-hidden border-8 border-white shadow-2xl">
                 <div className="absolute inset-0 z-0">
-                    <MapComponent partners={data.monitor} selectedPartner={selectedPartner} />
+                    <MapComponent partners={filteredData} selectedPartner={selectedPartner} />
                 </div>
                 <div className="absolute top-8 right-8 flex flex-col gap-4 z-10">
                     <button onClick={onRefresh} className="px-6 py-3 bg-white shadow-2xl rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all"><RefreshCw size={16}/> Refresh</button>

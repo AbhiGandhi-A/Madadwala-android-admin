@@ -6,22 +6,25 @@ import { useEffect } from 'react';
 
 // Elite Marker: Profile Image with High-Contrast Border and Status Dot
 const createEliteMarker = (status, imageUrl) => {
-  const color = status === 'online' ? '#10b981' : status === 'busy' ? '#6366f1' : '#94a3b8';
+  const statusColor = status === 'online' ? '#10b981' : status === 'busy' ? '#6366f1' : '#94a3b8';
   const img = imageUrl || 'https://via.placeholder.com/40';
 
   return new L.DivIcon({
     html: `
-      <div style="position: relative; width: 48px; height: 48px;">
+      <div class="elite-marker-wrapper" style="position: relative; width: 50px; height: 50px;">
         <div style="
           width: 48px;
           height: 48px;
           border-radius: 50%;
           border: 4px solid white;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.3);
           overflow: hidden;
-          background: #fff;
+          background: #f1f5f9;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         ">
-          <img src="${img}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40'" />
+          <img src="${img}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\\'font-weight:bold;color:#ccc;font-size:10px;\\\'>IMG</div>'" />
         </div>
         <div style="
           position: absolute;
@@ -29,11 +32,11 @@ const createEliteMarker = (status, imageUrl) => {
           right: 2px;
           width: 14px;
           height: 14px;
-          background-color: ${color};
+          background-color: ${statusColor};
           border: 2px solid white;
           border-radius: 50%;
           z-index: 20;
-          box-shadow: 0 0 10px ${color};
+          box-shadow: 0 0 10px ${statusColor};
         "></div>
         <div style="
           position: absolute;
@@ -46,52 +49,43 @@ const createEliteMarker = (status, imageUrl) => {
           border-right: 10px solid transparent;
           border-top: 12px solid white;
           margin-top: -6px;
-          filter: drop-shadow(0 4px 4px rgba(0,0,0,0.1));
         "></div>
       </div>
     `,
-    className: 'elite-marker-icon',
-    iconSize: [48, 60],
-    iconAnchor: [24, 60],
+    className: 'custom-leaflet-marker',
+    iconSize: [50, 60],
+    iconAnchor: [25, 60],
   });
 };
 
-// Component to handle dynamic map centering and zooming
 const MapController = ({ target }) => {
   const map = useMap();
   useEffect(() => {
     if (target?.lat && target?.lng) {
-      map.flyTo([target.lat, target.lng], 16, {
-        animate: true,
-        duration: 1.5,
-        easeLinearity: 0.25
-      });
+      map.flyTo([target.lat, target.lng], 16, { animate: true, duration: 1.5 });
     }
   }, [target, map]);
 
   useEffect(() => {
-    // Initial size fix for Leaflet in Next.js/React
-    setTimeout(() => {
-        map.invalidateSize();
-    }, 400);
+    // Initial size fix for Leaflet in Next.js
+    setTimeout(() => { map.invalidateSize(); }, 500);
   }, [map]);
 
   return null;
 };
 
 export default function MapComponent({ partners = [], selectedPartner }) {
-  // Default center point (India/Surat area)
+  // Default to Surat if no markers
   const defaultPos = [21.1702, 72.8311];
 
   return (
-    <div className="w-full h-full bg-slate-50 font-sans">
+    <div className="w-full h-full bg-slate-50 relative" style={{ minHeight: '400px' }}>
       <MapContainer
         center={defaultPos}
         zoom={12}
-        style={{ height: '100%', width: '100%' }}
+        style={{ height: '100%', width: '100%', zIndex: 1 }}
         zoomControl={false}
       >
-        {/* Google Maps Styled Professional Tiles (Unofficial) */}
         <TileLayer
           url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
           attribution='&copy; Google Maps'
@@ -105,11 +99,12 @@ export default function MapComponent({ partners = [], selectedPartner }) {
               key={p.uid}
               position={[p.lat, p.lng]}
               icon={createEliteMarker(p.status, p.profileImage)}
+              zIndexOffset={selectedPartner?.uid === p.uid ? 1000 : 0}
             >
               <Popup offset={[0, -50]}>
-                <div className="p-1 text-center min-w-[100px]">
-                  <p className="font-bold text-slate-900 uppercase text-[10px] tracking-tight mb-1">{p.name}</p>
-                  <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-widest">{p.status}</p>
+                <div className="text-center font-sans">
+                  <p className="font-bold text-slate-800 uppercase text-[10px]">{p.name}</p>
+                  <p className="text-[9px] text-indigo-500 font-bold uppercase">{p.status}</p>
                 </div>
               </Popup>
             </Marker>
@@ -118,6 +113,17 @@ export default function MapComponent({ partners = [], selectedPartner }) {
 
         <MapController target={selectedPartner} />
       </MapContainer>
+
+      {/* CSS fix for marker rendering */}
+      <style jsx global>{`
+        .custom-leaflet-marker {
+          background: transparent !important;
+          border: none !important;
+        }
+        .leaflet-marker-icon {
+          will-change: transform;
+        }
+      `}</style>
     </div>
   );
 }
