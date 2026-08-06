@@ -190,7 +190,7 @@ export default function AdminDashboard() {
                               <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                   <div className="flex gap-6">
                                       <button onClick={()=>setFormState({...formState, type: 'credit'})} className={`flex-1 py-7 rounded-[35px] font-black uppercase text-xs tracking-[4px] border-4 transition-all ${formState.type === 'credit' ? 'bg-emerald-500 border-emerald-100 text-white shadow-2xl shadow-emerald-500/30' : 'bg-slate-50 border-transparent text-slate-300'}`}>INJECT (+)</button>
-                                      <button onClick={()=>setFormState({...formState, type: 'debit'})} className={`flex-1 py-7 rounded-[35px] font-black uppercase text-xs tracking-[4px] border-4 transition-all ${formState.type === 'debit' ? 'bg-red-500 border-red-100 text-white shadow-2xl shadow-red-500/30' : 'bg-slate-50 border-transparent text-slate-300'}`}>EXTRACT (-)</button>
+                                      <button onClick={()=>setFormState({...formState, type: 'debit'})} className={`flex-1 py-7 rounded-[35px] font-black uppercase text-xs tracking-[4px] border-4 transition-all ${formState.type === 'debit' ? 'bg-red-50 border-red-100 text-white shadow-2xl shadow-red-500/30' : 'bg-slate-50 border-transparent text-slate-300'}`}>EXTRACT (-)</button>
                                   </div>
                                   <div className="space-y-3">
                                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] ml-2">ASSET VALUATION (INR)</label>
@@ -198,6 +198,37 @@ export default function AdminDashboard() {
                                           <span className="absolute left-8 top-1/2 -translate-y-1/2 text-4xl font-black text-slate-200">₹</span>
                                           <input type="number" value={formState.amount} onChange={e=>setFormState({...formState, amount: e.target.value})} placeholder="0.00" className="w-full p-10 pl-16 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-[45px] outline-none font-black text-6xl transition-all shadow-inner tracking-tighter italic" />
                                       </div>
+                                  </div>
+                              </div>
+                          )}
+
+                          {activeModal === 'broadcast' && (
+                              <div className="space-y-6">
+                                  <div className="space-y-2">
+                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Audience</label>
+                                      <select value={formState.role} onChange={e=>setFormState({...formState, role: e.target.value})} className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-black transition-all appearance-none cursor-pointer shadow-inner">
+                                          <option value="all">Every Account on Platform</option>
+                                          <option value="customer">Customers Only</option>
+                                          <option value="provider">Partners Only</option>
+                                      </select>
+                                  </div>
+                                  <div className="space-y-2">
+                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Push Title</label>
+                                      <input value={formState.title} onChange={e=>setFormState({...formState, title: e.target.value})} placeholder="Urgent Announcement" className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-bold transition-all shadow-inner" />
+                                  </div>
+                                  <div className="space-y-2">
+                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notification Body</label>
+                                      <textarea rows={6} value={formState.message} onChange={e=>setFormState({...formState, message: e.target.value})} placeholder="Write the message that will pop up on user phones..." className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-bold transition-all resize-none shadow-inner" />
+                                  </div>
+                              </div>
+                          )}
+
+                          {activeModal === 'delete' && (
+                              <div className="text-center space-y-8 py-10">
+                                  <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500 animate-pulse"><Trash2 size={48}/></div>
+                                  <div>
+                                      <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Security Protocol Required</h4>
+                                      <p className="text-slate-400 font-medium leading-relaxed italic mt-4 px-6">This action will trigger a permanent cascade deletion of all user data. This is irreversible.</p>
                                   </div>
                               </div>
                           )}
@@ -247,6 +278,23 @@ export default function AdminDashboard() {
           </div>
       )}
     </div>
+  );
+}
+
+function NavItem({ icon, label, active, onClick, count, pulse }) {
+  return (
+    <button onClick={onClick} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl transition-all duration-500 ${active ? 'bg-indigo-600 text-white shadow-[0_10px_30px_rgba(79,70,229,0.3)]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
+      <div className="flex items-center space-x-3">
+        {pulse && !active ? (
+            <div className="relative">
+                <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-25"></div>
+                {icon}
+            </div>
+        ) : icon}
+        <span className="font-bold text-sm tracking-tight">{label}</span>
+      </div>
+      {count > 0 && <span className={`px-2 py-0.5 text-[9px] font-black rounded-lg ${active ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'}`}>{count}</span>}
+    </button>
   );
 }
 
@@ -323,7 +371,7 @@ const MonitorView = ({ data }) => (
                                 <div className="w-1 h-8 bg-indigo-500/30 rounded-full mt-1"></div>
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">04:2{i} PM</p>
-                                    <p className="text-xs font-bold text-white mt-1 leading-relaxed opacity-90 italic">Partner <span className="text-indigo-400 underline">Rahul</span> initiated arrival sequence at client location.</p>
+                                    <p className="text-xs font-bold text-white mt-1 leading-relaxed opacity-90 italic">Event <span className="text-indigo-400 underline">#{1000+i}</span> processed via node_alpha.</p>
                                 </div>
                             </div>
                         ))}
@@ -342,35 +390,268 @@ const StatusPill = ({ color, label, count }) => (
     </div>
 );
 
-function AnalyticsView({ data }) {
-    if (!data) return null;
-    return (
-        <div className="space-y-12">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <StatCard title="Total Consumers" value={data.totalUsers} color="text-indigo-600" />
-                <StatCard title="Active Partners" value={data.totalProviders} color="text-emerald-600" />
-                <StatCard title="Total Revenue" value={`₹${data.totalRevenue?.toLocaleString()}`} color="text-slate-900" />
-                <StatCard title="Job Orders" value={data.totalBookings} color="text-blue-600" />
+const AnalyticsView = ({ data }) => !data ? null : (
+  <div className="space-y-12">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <StatCard title="Total Consumers" value={data.totalUsers} color="text-indigo-600" />
+        <StatCard title="Active Partners" value={data.totalProviders} color="text-emerald-600" />
+        <StatCard title="Total Revenue" value={`₹${data.totalRevenue?.toLocaleString()}`} color="text-slate-900" />
+        <StatCard title="Job Orders" value={data.totalBookings} color="text-blue-600" />
+      </div>
+      <div className="bg-white p-12 rounded-[50px] border border-slate-100 shadow-sm">
+          <h3 className="font-black text-slate-900 uppercase tracking-[8px] italic text-xs mb-12">Resource Allocation Matrix</h3>
+          <div className="space-y-12">
+              {data.categories?.map((cat, i) => (
+                  <div key={i}>
+                      <div className="flex justify-between items-end mb-4">
+                          <div>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px]">{cat.name}</p>
+                              <p className="text-2xl font-black text-slate-900 tracking-tighter italic">Sector Analysis</p>
+                          </div>
+                          <p className="text-3xl font-black text-indigo-600 italic tracking-tighter">{Math.round(cat.ratio * 100)}%</p>
+                      </div>
+                      <div className="w-full bg-slate-50 rounded-full h-8 overflow-hidden p-2 shadow-inner border border-slate-100">
+                          <div className="bg-gradient-to-r from-indigo-500 to-indigo-400 h-full rounded-full transition-all duration-1000 shadow-xl" style={{ width: `${cat.ratio * 100}%` }}></div>
+                      </div>
+                  </div>
+              ))}
+          </div>
+      </div>
+  </div>
+);
+
+const StatCard = ({ title, value, color }) => (
+  <div className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-sm group hover:shadow-2xl transition-all duration-700 relative overflow-hidden">
+    <div className="absolute bottom-0 right-0 w-24 h-24 bg-slate-50 rounded-tl-[40px] -mr-4 -mb-4 opacity-50"></div>
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3">{title}</p>
+    <p className={`text-5xl font-black tracking-tighter ${color} relative z-10`}>{value || 0}</p>
+  </div>
+);
+
+const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, title, isPartner }) => (
+  <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+    <div className="px-12 py-8 border-b border-slate-50 bg-white flex justify-between items-center">
+        <h3 className="font-black text-slate-800 text-xs uppercase tracking-[6px] italic">{title} Ecosystem</h3>
+        <div className="px-6 py-2.5 bg-slate-900 rounded-full text-[9px] font-black text-white uppercase tracking-[2px] shadow-xl shadow-slate-200">{users?.length || 0} RECORDS</div>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left">
+        <thead>
+          <tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[3px]">
+            <th className="px-12 py-6">Identity</th>
+            <th className="px-12 py-6">Wallet</th>
+            <th className="px-12 py-6 text-center">Status</th>
+            <th className="px-12 py-6 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {!users || users.length === 0 ? (
+            <tr><td colSpan="4" className="px-10 py-32 text-center text-slate-200 italic font-black uppercase tracking-[5px]">Empty Registry</td></tr>
+          ) : (
+            users.map(u => (
+              <tr key={u.uid} className="hover:bg-slate-50/50 transition-all group">
+                <td className="px-12 py-8">
+                  <div className="flex items-center space-x-5 cursor-pointer" onClick={()=>onDetails(u)}>
+                    <img src={u.profileImage || 'https://via.placeholder.com/64'} className="w-14 h-14 rounded-2xl object-cover border-4 border-white shadow-xl group-hover:scale-110 transition-all duration-500" />
+                    <div><p className="font-black text-slate-800 group-hover:text-indigo-600 transition-colors text-lg tracking-tight">{u.name || 'ANONYMOUS'}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{u.phoneNumber}</p></div>
+                  </div>
+                </td>
+                <td className="px-12 py-8">
+                    <div className="p-4 bg-indigo-50/50 rounded-[20px] border border-indigo-100/50 w-fit shadow-sm">
+                        <p className="text-lg font-black text-indigo-600 italic tracking-tight">₹{u.walletBalance?.toFixed(0) || 0}</p>
+                    </div>
+                </td>
+                <td className="px-12 py-8 text-center">
+                  <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase border-2 transition-all shadow-md ${u.isBlocked ? 'bg-red-50 border-red-100 text-red-500 shadow-red-100' : 'bg-emerald-50 border-emerald-100 text-emerald-500 shadow-emerald-100'}`}>{u.isBlocked ? 'SUSPENDED' : 'AUTHORIZED'}</span>
+                </td>
+                <td className="px-12 py-8 text-right space-x-3">
+                  <button onClick={()=>onWarn(u)} className="p-4 bg-amber-50 text-amber-500 rounded-2xl hover:bg-amber-500 hover:text-white transition-all shadow-sm hover:shadow-xl hover:shadow-amber-200" title="Issue Warning"><AlertTriangle size={18}/></button>
+                  <button onClick={()=>onWallet(u)} className="p-4 bg-indigo-50 text-indigo-500 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm hover:shadow-xl hover:shadow-indigo-200" title="Wallet Control"><Wallet size={18}/></button>
+                  <button onClick={()=>onBlock(u)} className={`p-4 rounded-2xl transition-all shadow-sm ${u.isBlocked ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white hover:shadow-xl hover:shadow-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-900 hover:text-white hover:shadow-xl hover:shadow-slate-300'}`} title={u.isBlocked ? 'Restore' : 'Block'}><ShieldAlert size={18}/></button>
+                  <button onClick={()=>onDelete(u)} className="p-4 bg-red-50 text-red-400 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm hover:shadow-xl hover:shadow-red-200" title="Delete Account"><Trash2 size={18}/></button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+const PendingView = ({ providers, onApprove }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+    {providers.length === 0 ? (
+       <div className="col-span-full p-40 bg-white rounded-[60px] border-4 border-dashed border-slate-50 text-center text-slate-200 font-black uppercase tracking-[15px]">Zero Inbound Requests</div>
+    ) : (
+      providers.map(p => (
+        <div key={p.uid} className="bg-white p-12 rounded-[50px] shadow-sm border border-slate-100 relative group overflow-hidden hover:shadow-2xl transition-all duration-700">
+          <div className="absolute top-0 right-0 p-10 flex flex-col gap-3">
+              <button onClick={()=>onApprove(p.uid)} className="p-5 bg-indigo-600 text-white rounded-[24px] shadow-2xl shadow-indigo-200 hover:scale-110 active:scale-95 transition-all font-black uppercase text-[10px] tracking-[2px]">Validate Credentials</button>
+          </div>
+          <div className="flex flex-col items-center text-center space-y-8">
+            <img src={p.profileImage || 'https://via.placeholder.com/120'} className="w-32 h-32 rounded-[40px] object-cover ring-[12px] ring-slate-50 shadow-2xl transition-all duration-700" />
+            <div>
+                <h4 className="font-black text-3xl tracking-tighter text-slate-800 uppercase">{p.name}</h4>
+                <p className="text-[11px] font-black text-indigo-500 uppercase tracking-[4px] mt-3 italic">{p.profession || 'SPECIALIST'}</p>
             </div>
-            <div className="bg-white p-12 rounded-[50px] border border-slate-100 shadow-sm">
-                <h3 className="font-black text-slate-900 uppercase tracking-[8px] italic text-xs mb-12">Resource Allocation Matrix</h3>
-                <div className="space-y-12">
-                    {data.categories?.map((cat, i) => (
-                        <div key={i}>
-                            <div className="flex justify-between items-end mb-4">
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px]">{cat.name}</p>
-                                    <p className="text-2xl font-black text-slate-900 tracking-tighter italic">Sector Analysis</p>
-                                </div>
-                                <p className="text-3xl font-black text-indigo-600 italic tracking-tighter">{Math.round(cat.ratio * 100)}%</p>
-                            </div>
-                            <div className="w-full bg-slate-50 rounded-full h-8 overflow-hidden p-2 shadow-inner border border-slate-100">
-                                <div className="bg-gradient-to-r from-indigo-500 to-indigo-400 h-full rounded-full transition-all duration-1000 shadow-xl" style={{ width: `${cat.ratio * 100}%` }}></div>
-                            </div>
-                        </div>
-                    ))}
+            <div className="w-full grid grid-cols-2 gap-4">
+                <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 shadow-inner">
+                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">GOVT ID (AADHAAR)</p>
+                    <p className="text-sm font-black text-slate-700 tracking-widest">{p.aadhaarNumber}</p>
+                </div>
+                <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 flex items-center justify-center cursor-pointer hover:bg-indigo-600 hover:text-white transition-all duration-500 group/eye shadow-inner">
+                    <Eye size={24} className="text-indigo-400 group-hover/eye:text-white transition-colors"/>
                 </div>
             </div>
+          </div>
         </div>
-    );
-}
+      ))
+    )}
+  </div>
+);
+
+const WithdrawalsTable = ({ withdrawals, onHandle }) => (
+  <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+    <div className="p-12 border-b border-slate-50 flex justify-between items-center bg-white font-black text-slate-800 text-xs uppercase tracking-[8px]">Partner Asset Liquidation</div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left">
+        <thead className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[4px]">
+          <tr><th className="px-12 py-8">Account Holder</th><th className="px-12 py-8">Asset Valuation</th><th className="px-12 py-8 text-right">Confirmation</th></tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {withdrawals.length === 0 ? (
+            <tr><td colSpan="3" className="px-10 py-32 text-center text-slate-200 italic font-black uppercase tracking-[5px]">Zero Pending Payouts</td></tr>
+          ) : (
+            withdrawals.map(w => (
+              <tr key={w._id} className="hover:bg-slate-50/50 transition-all">
+                <td className="px-12 py-10 font-black text-slate-800 uppercase tracking-tighter text-xl">{w.providerName}</td>
+                <td className="px-12 py-10 text-indigo-600 font-black text-4xl italic tracking-tighter">₹{w.amount}</td>
+                <td className="px-12 py-10 text-right space-x-4">
+                    <button onClick={()=>onHandle(w._id, 'approved')} className="px-10 py-4 bg-slate-900 text-white text-[10px] font-black rounded-[20px] uppercase tracking-[3px] shadow-2xl hover:bg-indigo-600 transition-all duration-500">Initialize Transfer</button>
+                    <button onClick={()=>onHandle(w._id, 'rejected')} className="px-10 py-4 bg-red-50 text-red-400 text-[10px] font-black rounded-[20px] uppercase tracking-[3px] hover:bg-red-500 hover:text-white transition-all">Deny File</button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+const JobsTable = ({ jobs, title }) => (
+  <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+    <div className="px-12 py-8 border-b font-black uppercase text-[10px] tracking-[6px] bg-white text-slate-800 flex justify-between items-center">
+        <span>{title}</span>
+        <div className="px-5 py-2 bg-indigo-50 text-indigo-600 rounded-full font-black italic tracking-widest">{jobs?.length || 0} TOTAL OPS</div>
+    </div>
+    <table className="w-full text-left border-collapse">
+      <thead className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[4px] border-b border-slate-50">
+          <tr><th className="px-12 py-7">Mission Configuration</th><th className="px-12 py-7">Field Deployment</th><th className="px-12 py-7 text-right">Resource Credit</th></tr>
+      </thead>
+      <tbody className="divide-y divide-slate-50">
+        {(!jobs || jobs.length === 0) ? (
+          <tr><td colSpan="3" className="px-10 py-40 text-center text-slate-200 italic font-black uppercase tracking-[10px]">Registry Empty</td></tr>
+        ) : (
+          jobs.map(j => (
+            <tr key={j._id} className="hover:bg-slate-50/50 transition-all duration-500">
+              <td className="px-12 py-10">
+                  <p className="font-black text-slate-800 uppercase tracking-tighter text-2xl">{j.serviceName}</p>
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-[3px] mt-2 italic">{new Date(j.createdAt).toLocaleString()}</p>
+              </td>
+              <td className="px-12 py-10">
+                  <span className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase border-2 transition-all shadow-lg ${j.status === 'done' ? 'bg-emerald-50 border-emerald-100 text-emerald-500 shadow-emerald-50' : 'bg-indigo-50 border-indigo-100 text-indigo-500 shadow-indigo-50'}`}>{j.status.replace('_',' ')}</span>
+              </td>
+              <td className="px-12 py-10 text-right font-black text-3xl italic tracking-tighter text-slate-900">₹{j.totalAmount}</td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  </div>
+);
+
+const CategoriesView = ({ categories, refresh }) => {
+  const [n, setN] = useState(''); const [i, setI] = useState('');
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+      <div className="bg-[#0F172A] p-12 rounded-[50px] shadow-2xl h-fit border border-white/5 relative overflow-hidden">
+        <h3 className="font-black mb-10 uppercase text-[10px] tracking-[5px] text-indigo-400 italic">Initialize Module</h3>
+        <div className="space-y-8">
+            <input value={n} onChange={e=>setN(e.target.value)} placeholder="VECTOR NAME" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[24px] font-black text-white outline-none focus:border-indigo-500 uppercase tracking-widest text-xs" />
+            <input value={i} onChange={e=>setI(e.target.value)} placeholder="ASSET URI" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[24px] font-bold text-white outline-none focus:border-indigo-500 text-xs" />
+            <button onClick={()=>adminApi.addCategory({name:n, icon:i}).then(refresh)} className="w-full py-6 bg-indigo-600 text-white font-black rounded-[28px] uppercase text-xs tracking-[5px] shadow-2xl shadow-indigo-900/50 hover:bg-white hover:text-indigo-600 transition-all">Initialize Deploy</button>
+        </div>
+      </div>
+      <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-8">
+        {categories.map(c => (
+            <div key={c._id} className="bg-white p-10 rounded-[45px] border border-slate-100 shadow-sm flex flex-col items-center hover:shadow-2xl hover:scale-[1.03] transition-all duration-700 group relative overflow-hidden">
+                <div className="w-24 h-24 bg-slate-50 rounded-[35px] flex items-center justify-center mb-8 shadow-inner group-hover:rotate-12 transition-transform duration-500">
+                    <img src={c.icon || 'https://via.placeholder.com/80'} className="w-16 h-16 object-contain drop-shadow-2xl" />
+                </div>
+                <p className="font-black text-slate-800 uppercase tracking-[3px] text-xs text-center leading-relaxed">{c.name}</p>
+            </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ReportsView = ({ reports }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+    {reports.length === 0 ? <div className="col-span-full p-60 bg-white rounded-[60px] border-4 border-dashed border-slate-50 text-center text-slate-100 font-black uppercase tracking-[30px]">STATUS NOMINAL</div> : reports.map(r => (
+      <div key={r._id} className="bg-white p-12 rounded-[50px] border-l-[16px] border-red-500 shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 px-8 py-3 bg-red-600 text-white text-[10px] font-black uppercase rounded-bl-[30px] tracking-[4px] shadow-2xl">{r.status}</div>
+        <h4 className="font-black text-slate-800 uppercase text-2xl tracking-tighter mb-6">{r.reason}</h4>
+        <div className="bg-slate-50 p-6 rounded-[30px] shadow-inner mb-10 font-bold text-slate-500 italic opacity-90 text-sm leading-relaxed">"{r.description}"</div>
+        <div className="flex gap-4 overflow-x-auto pb-6 custom-scrollbar scroll-smooth">
+            {r.evidenceUrls?.map((u, i) => (
+                <img key={i} src={u} className="w-24 h-24 rounded-[32px] border-8 border-white object-cover shadow-2xl hover:scale-110 hover:rotate-6 transition-all flex-shrink-0" />
+            ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const ReviewsView = ({ reviews, onDelete }) => (
+  <div className="bg-white rounded-[50px] border border-slate-100 shadow-sm overflow-hidden text-left">
+    <div className="px-12 py-10 border-b border-slate-50 bg-white font-black text-slate-800 text-xs uppercase tracking-[10px]">Sentiment Intelligence</div>
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead><tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[5px]">
+            <th className="px-12 py-8">Reviewer</th><th className="px-12 py-8 text-left">Analysis</th><th className="px-12 py-8 text-right">Delete</th>
+        </tr></thead>
+        <tbody className="divide-y divide-slate-50">
+          {reviews.map(r => (
+            <tr key={r._id} className="hover:bg-slate-50/50 transition-all duration-500">
+              <td className="px-12 py-10 font-black text-slate-800 uppercase tracking-tighter text-xl">{r.customerName}
+                  <div className="flex gap-1 mt-3">{[...Array(5)].map((_, i) => <Star key={i} size={14} className={i < r.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} />)}</div>
+              </td>
+              <td className="px-12 py-10"><div className="p-6 bg-slate-50 rounded-[30px] border border-slate-100 shadow-inner italic font-bold text-slate-500">"{r.comment}"</div></td>
+              <td className="px-12 py-10 text-right"><button onClick={()=>onDelete(r._id)} className="p-6 bg-red-50 text-red-400 rounded-[30px] hover:bg-red-500 hover:text-white transition-all shadow-xl active:scale-90"><Trash2 size={24}/></button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+const SettingsView = ({ settings, refresh }) => {
+  const [c, setC] = useState(settings.commission_percentage || 15);
+  return (
+    <div className="bg-[#0F172A] p-16 rounded-[60px] border-8 border-white/5 max-w-3xl shadow-[0_60px_150px_rgba(0,0,0,0.5)] relative overflow-hidden group">
+      <h3 className="font-black uppercase text-[10px] tracking-[10px] mb-16 text-indigo-400 italic italic">Central Logic Control</h3>
+      <div className="flex justify-between items-center mb-16 relative z-10 text-white uppercase font-black text-3xl tracking-tighter">
+          <div><p>Revenue Cut %</p><p className="text-slate-500 text-sm mt-3 font-medium italic normal-case tracking-normal">Platform fee per successful job completion.</p></div>
+          <div className="flex items-center space-x-6 bg-white/5 p-8 rounded-[40px] border-2 border-white/10">
+              <input type="number" value={c} onChange={e=>setC(e.target.value)} className="w-32 h-32 text-center bg-transparent font-black text-6xl text-indigo-400 outline-none" />
+              <span className="font-black text-white/5 text-8xl italic select-none">%</span>
+          </div>
+      </div>
+      <button onClick={()=>adminApi.updateSetting('commission_percentage', c).then(()=>alert('Engine Synced'))} className="w-full py-8 bg-indigo-600 text-white font-black rounded-[35px] uppercase text-sm tracking-[8px] shadow-[0_20px_50px_rgba(79,70,229,0.5)] hover:bg-white hover:text-indigo-600 transition-all duration-500">UPDATE GLOBAL ENGINE</button>
+    </div>
+  );
+};
