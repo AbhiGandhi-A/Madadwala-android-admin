@@ -2,7 +2,7 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 // Enhanced custom icon with Profile Image and Status Glow
 const createProfileMarker = (color, imageUrl) => {
@@ -15,11 +15,11 @@ const createProfileMarker = (color, imageUrl) => {
           height: 42px;
           border-radius: 50%;
           border: 3px solid white;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.15);
           overflow: hidden;
           background: #f1f5f9;
         ">
-          <img src="${image}" style="width: 100%; height: 100%; object-fit: cover;" />
+          <img src="${image}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://via.placeholder.com/40'" />
         </div>
         <div style="
           position: absolute;
@@ -57,17 +57,30 @@ const RecenterMap = ({ lat, lng }) => {
   const map = useMap();
   useEffect(() => {
     if (lat && lng) {
-      map.setView([lat, lng], 16, { animate: true, duration: 1 });
+      map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
     }
   }, [lat, lng, map]);
   return null;
 };
 
+// Component to fix "white map" issue by invalidating size after initial render
+const MapResizeFix = () => {
+  const map = useMap();
+  useEffect(() => {
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+  }, [map]);
+  return null;
+};
+
 export default function MapComponent({ partners = [], selectedPartner }) {
-  const center = selectedPartner?.lat ? [selectedPartner.lat, selectedPartner.lng] : [21.1702, 72.8311];
+  // Default to Surat coordinates if no partner is selected
+  const defaultCenter = [21.1702, 72.8311];
+  const center = selectedPartner?.lat ? [selectedPartner.lat, selectedPartner.lng] : defaultCenter;
 
   return (
-    <div style={{ height: '100%', width: '100%', background: '#f8fafc' }}>
+    <div className="w-full h-full bg-slate-50">
       <MapContainer
         center={center}
         zoom={13}
@@ -76,12 +89,12 @@ export default function MapComponent({ partners = [], selectedPartner }) {
         scrollWheelZoom={true}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
 
         {Array.isArray(partners) && partners.map((p) => {
-          if (!p.lat || !p.lng) return null;
+          if (!p.lat || !p.lng || isNaN(p.lat) || isNaN(p.lng)) return null;
 
           const statusColor = p.status === 'online' ? '#10b981' : p.status === 'busy' ? '#4f46e5' : '#94a3b8';
 
@@ -91,10 +104,13 @@ export default function MapComponent({ partners = [], selectedPartner }) {
               position={[p.lat, p.lng]}
               icon={createProfileMarker(statusColor, p.profileImage)}
             >
-              <Popup offset={[0, -40]} className="custom-map-popup">
-                <div className="p-2 min-w-[120px] text-center">
-                  <p className="font-black text-slate-900 uppercase text-[11px] tracking-tight mb-1 italic">{p.name}</p>
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${p.status === 'online' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>{p.status}</span>
+              <Popup offset={[0, -40]}>
+                <div className="p-1 min-w-[100px] text-center font-sans">
+                  <p className="font-bold text-slate-800 uppercase text-[10px] tracking-tight mb-1">{p.name}</p>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }}></div>
+                    <p className="text-[8px] font-bold text-slate-500 uppercase">{p.status}</p>
+                  </div>
                 </div>
               </Popup>
             </Marker>
@@ -102,6 +118,7 @@ export default function MapComponent({ partners = [], selectedPartner }) {
         })}
 
         <RecenterMap lat={selectedPartner?.lat} lng={selectedPartner?.lng} />
+        <MapResizeFix />
       </MapContainer>
     </div>
   );
