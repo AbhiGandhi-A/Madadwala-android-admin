@@ -6,12 +6,12 @@ import {
   Tag, CreditCard, Bell, ChevronRight, Search, ShieldAlert,
   UserCheck, UserMinus, Clock, Filter, FileText, AlertTriangle,
   Trash2, Plus, Star, Wallet, Send, X, MoreVertical, Eye, Check,
-  Activity, Zap, MapPin, Navigation, Info
+  Activity, Zap, MapPin, Navigation, Info, RefreshCw, Maximize2, Phone, ExternalLink
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('analytics');
+  const [activeTab, setActiveTab] = useState('monitor');
   const [data, setData] = useState({
     analytics: null, pendingProviders: [], withdrawals: [],
     activeJobs: [], categories: [], offers: [], banners: [],
@@ -24,6 +24,7 @@ export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [formState, setFormState] = useState({ title: '', message: '', amount: '', type: 'credit', description: '', role: 'all' });
   const [toast, setToast] = useState(null);
+  const [selectedPartner, setSelectedPartner] = useState(null);
 
   useEffect(() => { fetchTabData(activeTab); }, [activeTab]);
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function AdminDashboard() {
       let res;
       switch(tab) {
         case 'analytics': res = await adminApi.getAnalytics(); setData(p => ({...p, analytics: res.data})); break;
-        case 'monitor': res = await adminApi.getMonitor(); setData(p => ({...p, monitor: res.data})); break;
+        case 'monitor': res = await adminApi.getMonitor(); setData(p => ({...p, monitor: res.data})); if(res.data.length > 0 && !selectedPartner) setSelectedPartner(res.data[0]); break;
         case 'providers-pending': res = await adminApi.getPendingProviders(); setData(p => ({...p, pendingProviders: res.data})); break;
         case 'customers': res = await adminApi.getAllUsers(); setData(p => ({...p, allUsers: res.data})); break;
         case 'providers-all': res = await adminApi.getAllProviders(); setData(p => ({...p, allProviders: res.data})); break;
@@ -81,48 +82,42 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <aside className="w-64 bg-[#020617] text-white flex flex-col shadow-2xl shrink-0 z-20">
-        <div className="p-8 border-b border-white/5 font-black text-2xl tracking-tighter italic">MADADWALA</div>
+      <aside className="w-64 bg-[#0A0D17] text-white flex flex-col shrink-0 z-20">
+        <div className="p-8 border-b border-white/5 font-black text-2xl tracking-tighter uppercase italic">MADADWALA</div>
         <nav className="flex-1 px-4 py-8 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon={<Activity size={18}/>} label="Mission Control" active={activeTab==='monitor'} onClick={()=>setActiveTab('monitor')} />
           <NavItem icon={<BarChart3 size={18}/>} label="Global Analytics" active={activeTab==='analytics'} onClick={()=>setActiveTab('analytics')} />
-          <div className="pt-6 pb-2 px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Management</div>
+          <div className="pt-8 pb-2 px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Management</div>
           <NavItem icon={<Users size={18}/>} label="Consumers" active={activeTab==='customers'} onClick={()=>setActiveTab('customers')} />
           <NavItem icon={<UserCheck size={18}/>} label="Partners" active={activeTab==='providers-all'} onClick={()=>setActiveTab('providers-all')} />
           <NavItem icon={<ShieldAlert size={18}/>} label="Approvals" active={activeTab==='providers-pending'} onClick={()=>setActiveTab('providers-pending')} count={data.pendingProviders.length} />
-
-          <div className="pt-6 pb-2 px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Operations</div>
+          <div className="pt-8 pb-2 px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Operations</div>
           <NavItem icon={<CreditCard size={18}/>} label="Payouts" active={activeTab==='withdrawals'} onClick={()=>setActiveTab('withdrawals')} count={data.withdrawals.length} />
           <NavItem icon={<Navigation size={18}/>} label="Live Jobs" active={activeTab==='jobs'} onClick={()=>setActiveTab('jobs')} />
           <NavItem icon={<Briefcase size={18}/>} label="Archives" active={activeTab==='bookings-all'} onClick={()=>setActiveTab('bookings-all')} />
-
-          <div className="pt-6 pb-2 px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Feedback</div>
+          <div className="pt-8 pb-2 px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">Feedback</div>
           <NavItem icon={<FileText size={18}/>} label="Violation Reports" active={activeTab==='reports'} onClick={()=>setActiveTab('reports')} />
           <NavItem icon={<Star size={18}/>} label="User Reviews" active={activeTab==='reviews'} onClick={()=>setActiveTab('reviews')} />
           <NavItem icon={<Settings size={18}/>} label="Platform Rules" active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} />
         </nav>
-        <div className="p-4 bg-white/5 m-4 rounded-2xl">
-            <button onClick={()=>openAction('broadcast')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2">
-                <Zap size={14}/> Broadcast
-            </button>
-        </div>
+        <div className="p-4 m-4 rounded-2xl bg-white/5"><button onClick={()=>openAction('broadcast')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-2"><Send size={14}/> Broadcast</button></div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-10 shrink-0 z-10">
-          <h2 className="text-xl font-black text-slate-800 tracking-tight italic uppercase">{activeTab.replace('-', ' ')}</h2>
-          <div className="w-12 h-12 rounded-2xl bg-slate-900 border-4 border-slate-50 flex items-center justify-center text-white font-black shadow-xl">A</div>
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-10 shrink-0 z-10 shadow-sm">
+          <h2 className="text-[10px] font-black text-slate-900 tracking-[3px] uppercase italic">{activeTab.replace('-', ' ')}</h2>
+          <div className="w-10 h-10 rounded-xl bg-slate-900 border-4 border-slate-50 flex items-center justify-center text-white font-black">A</div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-[#F8FAFC]">
+        <main className="flex-1 overflow-y-auto p-0 bg-[#F8FAFC]">
           {loading ? (
              <div className="flex flex-col items-center justify-center h-full gap-4">
                <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-               <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Synchronizing...</p>
+               <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Syncing...</p>
              </div>
           ) : (
-            <div className="max-w-[1400px] mx-auto">
-              {activeTab === 'monitor' && <MonitorView data={data.monitor} />}
+            <div className={`h-full ${activeTab !== 'monitor' ? 'p-10 max-w-[1400px] mx-auto' : ''}`}>
+              {activeTab === 'monitor' && <MonitorView data={data.monitor} onRefresh={()=>fetchTabData('monitor')} selectedPartner={selectedPartner} setSelectedPartner={setSelectedPartner} />}
               {activeTab === 'analytics' && <AnalyticsView data={data.analytics} />}
               {activeTab === 'customers' && <UsersTable users={data.allUsers} onWarn={(u)=>openAction('warning', u)} onWallet={(u)=>openAction('wallet', u)} onDelete={(u)=>openAction('delete', u)} onBlock={(u)=>adminApi.toggleBlock(u.uid).then(()=>{fetchTabData('customers'); showToast("Status Toggled");})} onDetails={(u)=>openAction('details', u)} title="Customers" />}
               {activeTab === 'providers-all' && <UsersTable users={data.allProviders} onWarn={(u)=>openAction('warning', u)} onWallet={(u)=>openAction('wallet', u)} onDelete={(u)=>openAction('delete', u)} onBlock={(u)=>adminApi.toggleBlock(u.uid).then(()=>{fetchTabData('providers-all'); showToast("Status Toggled");})} onDetails={(u)=>openAction('details', u)} title="Partners" isPartner />}
@@ -139,6 +134,7 @@ export default function AdminDashboard() {
         </main>
       </div>
 
+      {/* Slide-over Panel */}
       {activeModal && (
           <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
               <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={()=>setActiveModal(null)}></div>
@@ -149,7 +145,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
                       {selectedUser && activeModal !== 'broadcast' && (
-                          <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
+                          <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-100">
                               <img src={selectedUser.profileImage || 'https://via.placeholder.com/80'} className="w-16 h-16 rounded-2xl object-cover ring-4 ring-white shadow-xl" />
                               <div><p className="font-black text-slate-900 text-xl tracking-tight uppercase italic">{selectedUser.name}</p><p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">{selectedUser.phoneNumber}</p></div>
                           </div>
@@ -157,59 +153,19 @@ export default function AdminDashboard() {
 
                       {activeModal === 'warning' && (
                           <div className="space-y-6">
-                              <div className="space-y-2">
-                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">VIOLATION CLASS</label>
-                                  <input value={formState.title} onChange={e=>setFormState({...formState, title: e.target.value})} placeholder="e.g. Terms Violation" className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-black text-sm tracking-widest shadow-inner transition-all" />
-                              </div>
-                              <div className="space-y-2">
-                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">INCIDENT DEBRIEF</label>
-                                  <textarea rows={8} value={formState.message} onChange={e=>setFormState({...formState, message: e.target.value})} placeholder="Write detailed warning..." className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-[24px] outline-none font-bold text-slate-600 shadow-inner resize-none transition-all" />
-                              </div>
+                              <input value={formState.title} onChange={e=>setFormState({...formState, title: e.target.value})} placeholder="Violation Class" className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-black text-sm tracking-widest shadow-inner" />
+                              <textarea rows={8} value={formState.message} onChange={e=>setFormState({...formState, message: e.target.value})} placeholder="Incident details..." className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-[24px] outline-none font-bold text-slate-600 shadow-inner resize-none" />
                           </div>
                       )}
 
                       {activeModal === 'wallet' && (
                           <div className="space-y-10">
                               <div className="flex gap-4">
-                                  <button onClick={()=>setFormState({...formState, type: 'credit'})} className={`flex-1 py-6 rounded-[24px] font-black uppercase text-xs tracking-widest border-2 transition-all ${formState.type === 'credit' ? 'bg-emerald-500 border-emerald-500 text-white shadow-xl shadow-emerald-200' : 'bg-slate-50 border-transparent text-slate-300'}`}>Inject (+)</button>
-                                  <button onClick={()=>setFormState({...formState, type: 'debit'})} className={`flex-1 py-6 rounded-[24px] font-black uppercase text-xs tracking-widest border-2 transition-all ${formState.type === 'debit' ? 'bg-red-500 border-red-500 text-white shadow-xl shadow-red-200' : 'bg-slate-50 border-transparent text-slate-300'}`}>Extract (-)</button>
+                                  <button onClick={()=>setFormState({...formState, type: 'credit'})} className={`flex-1 py-6 rounded-[24px] font-black uppercase text-xs tracking-widest border-2 transition-all ${formState.type === 'credit' ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-50 border-transparent text-slate-300'}`}>Inject (+)</button>
+                                  <button onClick={()=>setFormState({...formState, type: 'debit'})} className={`flex-1 py-6 rounded-[24px] font-black uppercase text-xs tracking-widest border-2 transition-all ${formState.type === 'debit' ? 'bg-red-500 border-red-500 text-white' : 'bg-slate-50 border-transparent text-slate-300'}`}>Extract (-)</button>
                               </div>
-                              <div className="space-y-2">
-                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ASSET VALUATION (₹)</label>
-                                  <input type="number" value={formState.amount} onChange={e=>setFormState({...formState, amount: e.target.value})} placeholder="0.00" className="w-full p-8 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-[32px] outline-none font-black text-5xl tracking-tighter shadow-inner transition-all italic" />
-                              </div>
-                              <input value={formState.description} onChange={e=>setFormState({...formState, description: e.target.value})} placeholder="Internal Reason Note" className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-bold shadow-inner transition-all" />
-                          </div>
-                      )}
-
-                      {activeModal === 'broadcast' && (
-                          <div className="space-y-6">
-                              <div className="space-y-2">
-                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">TARGET AUDIENCE</label>
-                                  <select value={formState.role} onChange={e=>setFormState({...formState, role: e.target.value})} className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-black appearance-none cursor-pointer shadow-inner uppercase tracking-widest text-xs">
-                                      <option value="all">Universal (All Nodes)</option>
-                                      <option value="customer">Consumer Class</option>
-                                      <option value="provider">Partner Fleet</option>
-                                  </select>
-                              </div>
-                              <div className="space-y-2">
-                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">MISSION HEADLINE</label>
-                                  <input value={formState.title} onChange={e=>setFormState({...formState, title: e.target.value})} placeholder="Urgent Broadcast" className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-black text-sm shadow-inner transition-all" />
-                              </div>
-                              <div className="space-y-2">
-                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">DATA PACKAGE</label>
-                                  <textarea rows={8} value={formState.message} onChange={e=>setFormState({...formState, message: e.target.value})} placeholder="Broadcast body message..." className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-[24px] outline-none font-bold text-slate-600 shadow-inner resize-none transition-all" />
-                              </div>
-                          </div>
-                      )}
-
-                      {activeModal === 'delete' && (
-                          <div className="text-center space-y-10 py-10">
-                              <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500 shadow-inner"><Trash2 size={48}/></div>
-                              <div className="space-y-4">
-                                  <h4 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">ACCOUNT PURGE</h4>
-                                  <p className="text-slate-400 font-medium leading-relaxed italic opacity-80">This will permanently incinerate all data associated with this user node. Operation is irreversible.</p>
-                              </div>
+                              <input type="number" value={formState.amount} onChange={e=>setFormState({...formState, amount: e.target.value})} placeholder="₹ 0.00" className="w-full p-8 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-[32px] outline-none font-black text-5xl tracking-tighter shadow-inner italic" />
+                              <input value={formState.description} onChange={e=>setFormState({...formState, description: e.target.value})} placeholder="Reason Note" className="w-full p-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none font-bold shadow-inner" />
                           </div>
                       )}
 
@@ -231,20 +187,19 @@ export default function AdminDashboard() {
                                       {selectedUser.activityLog?.slice(-10).reverse().map((log, i) => (
                                           <div key={i} className="p-5 bg-white border border-slate-100 rounded-[22px] shadow-sm flex items-start gap-4">
                                               <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></div>
-                                              <div><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-indigo-600 uppercase italic">{log.event}</span><span className="text-[9px] font-bold text-slate-300">{new Date(log.timestamp).toLocaleTimeString()}</span></div><p className="text-xs text-slate-500 font-medium italic">"{log.description}"</p></div>
+                                              <div><div className="flex justify-between items-center mb-1"><span className="text-[10px] font-black text-indigo-600 uppercase italic">{log.event}</span><span className="text-[9px] text-slate-300 font-bold">{new Date(log.timestamp).toLocaleTimeString()}</span></div><p className="text-xs text-slate-500 font-medium italic">"{log.description}"</p></div>
                                           </div>
                                       ))}
-                                      {(!selectedUser.activityLog || selectedUser.activityLog.length === 0) && <p className="text-center py-20 text-slate-300 font-black uppercase text-[10px] tracking-widest italic">Zero Active Logs</p>}
                                   </div>
                               </div>
                           </div>
                       )}
                   </div>
-                  <div className="p-10 border-t border-slate-50 bg-white shadow-[0_-20px_60px_rgba(0,0,0,0.02)]">
+                  <div className="p-10 border-t border-slate-50 bg-white">
                       {activeModal !== 'details' ? (
-                          <button onClick={handleAction} className={`w-full py-6 rounded-[28px] font-black uppercase text-xs tracking-[5px] shadow-2xl transition-all hover:-translate-y-1 active:scale-95 ${activeModal === 'delete' ? 'bg-red-600 text-white shadow-red-200' : 'bg-slate-900 text-white shadow-slate-300'}`}>Confirm {activeModal}</button>
+                          <button onClick={handleAction} className={`w-full py-6 rounded-[28px] font-black uppercase text-xs tracking-[5px] shadow-2xl transition-all ${activeModal === 'delete' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'}`}>Confirm {activeModal}</button>
                       ) : (
-                          <button onClick={()=>setActiveModal(null)} className="w-full py-6 bg-slate-50 text-slate-400 rounded-[28px] font-black uppercase text-xs tracking-[5px] hover:bg-slate-100 transition-all">Dismiss Panel</button>
+                          <button onClick={()=>setActiveModal(null)} className="w-full py-6 bg-slate-50 text-slate-400 rounded-[28px] font-black uppercase text-xs tracking-[5px] hover:bg-slate-100">Dismiss Panel</button>
                       )}
                   </div>
               </div>
@@ -263,44 +218,105 @@ function NavItem({ icon, label, active, onClick, count }) {
   );
 }
 
-const MonitorView = ({ data }) => (
-    <div className="space-y-12 animate-in fade-in duration-200">
-        <div className="flex justify-between items-end">
-            <div><h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Mission Control</h3><p className="text-slate-400 font-black text-[10px] uppercase tracking-[5px] mt-2">Live Fleet Operations & Monitoring</p></div>
+const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner }) => {
+  const [filter, setFilter] = useState('all');
+  const filteredData = data.filter(p => filter === 'all' || p.status === filter);
+  const counts = {
+    total: data.length,
+    online: data.filter(p => p.status === 'online').length,
+    busy: data.filter(p => p.status === 'busy').length,
+    offline: data.filter(p => p.status === 'offline').length
+  };
+
+  return (
+    <div className="p-8 space-y-8 bg-[#F8FAFC] h-full flex flex-col">
+        <div className="flex justify-between items-start">
+            <div>
+                <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-3">Live Partner Tracking<span className="flex items-center gap-1.5 text-[10px] font-black text-emerald-500 normal-case tracking-normal"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Real-time</span></h3>
+                <p className="text-slate-400 font-bold text-xs mt-1 italic">Monitor all service partners and their live locations</p>
+            </div>
             <div className="flex gap-4">
-                <StatusPill color="bg-emerald-500" label="Online" count={data.filter(p=>p.status==='online').length} />
-                <StatusPill color="bg-indigo-500" label="Busy" count={data.filter(p=>p.status==='busy').length} />
-                <StatusPill color="bg-slate-300" label="Offline" count={data.filter(p=>p.status==='offline').length} />
+                <SummaryCard label="TOTAL PARTNERS" value={counts.total} sub="View all" />
+                <SummaryCard label="ONLINE" value={counts.online} sub={`${Math.round((counts.online/counts.total)*100) || 0}% of total`} color="text-emerald-500" />
+                <SummaryCard label="BUSY" value={counts.busy} sub={`${Math.round((counts.busy/counts.total)*100) || 0}% of total`} color="text-indigo-500" />
+                <SummaryCard label="OFFLINE" value={counts.offline} sub={`${Math.round((counts.offline/counts.total)*100) || 0}% of total`} color="text-slate-400" />
             </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {data.map(p => (
-                <div key={p.uid} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden transition-shadow hover:shadow-xl group">
-                    <div className={`absolute top-0 right-0 px-5 py-2 text-white font-black text-[8px] uppercase tracking-widest rounded-bl-[20px] ${p.status === 'online' ? 'bg-emerald-500' : p.status === 'busy' ? 'bg-indigo-500' : 'bg-slate-300'}`}>{p.status}</div>
-                    <div className="flex items-center gap-5 mb-8">
-                        <img src={p.profileImage || 'https://via.placeholder.com/80'} className="w-14 h-14 rounded-2xl object-cover ring-4 ring-slate-50 shadow-xl group-hover:scale-105 transition-all" />
-                        <div><h4 className="font-black text-slate-900 uppercase tracking-tight text-sm">{p.name}</h4><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{p.phoneNumber}</p></div>
-                    </div>
-                    {p.status === 'busy' ? (
-                        <div className="p-4 bg-indigo-50 rounded-[24px] border border-indigo-100 shadow-inner">
-                            <p className="font-black text-slate-800 text-[10px] truncate uppercase italic tracking-tighter">TASK: {p.currentTask?.service}</p>
-                            <div className="flex justify-between items-center mt-3"><span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">{p.currentTask?.status.replace('_', ' ')}</span><button className="text-[8px] font-black text-indigo-600 underline tracking-widest">DETAILS</button></div>
-                        </div>
-                    ) : <div className="p-4 bg-slate-50 rounded-[24px] border border-slate-100 flex items-center justify-center italic text-slate-300 text-[10px] font-black uppercase tracking-widest">{p.status === 'online' ? 'Awaiting Data' : 'Node Offline'}</div>}
+
+        <div className="flex-1 flex gap-8 min-h-0">
+            <div className="w-80 flex flex-col bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-slate-50 flex gap-1 bg-slate-50/50">
+                    {['all', 'online', 'busy', 'offline'].map(f => (
+                        <button key={f} onClick={()=>setFilter(f)} className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all ${filter===f ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-400 border border-slate-100 hover:border-slate-200'}`}>{f === 'all' ? 'All Partners' : f}</button>
+                    ))}
                 </div>
-            ))}
+                <div className="p-4 border-b border-slate-50 relative bg-white">
+                    <Search className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
+                    <input placeholder="Search partner or phone..." className="w-full pl-10 pr-10 py-3 bg-slate-50 rounded-2xl text-[11px] font-bold outline-none focus:bg-indigo-50/30 transition-all" />
+                    <Filter className="absolute right-7 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
+                    {filteredData.map(p => (
+                        <div key={p.uid} onClick={()=>setSelectedPartner(p)} className={`p-4 rounded-[24px] cursor-pointer transition-all border-2 ${selectedPartner?.uid === p.uid ? 'bg-white border-indigo-500 shadow-xl ring-4 ring-indigo-50' : 'bg-transparent border-transparent hover:bg-slate-50'}`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <img src={p.profileImage || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
+                                    <div><p className="font-black text-slate-800 text-[11px] uppercase italic tracking-tighter">{p.name}</p><p className="text-[9px] font-bold text-slate-400">Electrical</p></div>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase ${p.status === 'busy' ? 'bg-indigo-100 text-indigo-600' : p.status === 'online' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>{p.status}</span>
+                            </div>
+                            <div className="flex justify-between items-center mt-3 text-[10px] font-black"><p className="text-slate-400">{p.phoneNumber}</p><p className="text-emerald-500 flex items-center gap-1"><MapPin size={10}/> 0.5 km</p></div>
+                        </div>
+                    ))}
+                </div>
+                <div className="p-4 bg-slate-50 border-t border-slate-100 text-[9px] font-black text-slate-400 text-center uppercase tracking-widest">Showing {filteredData.length} Partners</div>
+            </div>
+
+            <div className="flex-1 bg-white rounded-[45px] relative overflow-hidden border-8 border-white shadow-2xl">
+                <div className="absolute inset-0 bg-slate-100 bg-[url('https://api.mapbox.com/styles/v1/mapbox/light-v10/static/72.83,21.17,12/1200x800?access_token=none')] bg-cover opacity-60"></div>
+                <div className="absolute top-8 right-8 flex flex-col gap-4">
+                    <button onClick={onRefresh} className="px-6 py-3 bg-white shadow-2xl rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all"><RefreshCw size={16}/> Refresh</button>
+                    <button className="p-3 bg-white shadow-2xl rounded-2xl hover:scale-105 transition-all"><Maximize2 size={18}/></button>
+                </div>
+                <div className="absolute bottom-10 right-8 flex flex-col gap-3">
+                    <div className="bg-white shadow-2xl rounded-[20px] flex flex-col"><button className="p-4 border-b border-slate-50 text-slate-400 hover:text-indigo-600 text-xl font-black">+</button><button className="p-4 text-slate-400 hover:text-indigo-600 text-xl font-black">-</button></div>
+                    <button className="p-4 bg-white shadow-2xl rounded-[20px] text-slate-400 hover:text-indigo-600"><Navigation size={22}/></button>
+                </div>
+                <div className="absolute bottom-10 left-10 p-5 bg-white/90 backdrop-blur-md rounded-[30px] shadow-2xl flex gap-8 border border-white/50">
+                    <Legend color="bg-emerald-500" label="Online" /><Legend color="bg-indigo-600" label="Busy" /><Legend color="bg-sky-500" label="Arrived" /><Legend color="bg-slate-200" label="Offline" />
+                </div>
+            </div>
         </div>
+
+        {selectedPartner && (
+            <div className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-100 flex items-center justify-between gap-12">
+                <div className="flex items-center gap-8">
+                    <img src={selectedPartner.profileImage || 'https://via.placeholder.com/80'} className="w-24 h-24 rounded-[30px] object-cover border-4 border-slate-50 shadow-xl" />
+                    <div><div className="flex items-center gap-4"><h4 className="font-black text-slate-800 text-2xl tracking-tighter uppercase italic">{selectedPartner.name}</h4><span className="px-4 py-1 bg-emerald-100 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest">{selectedPartner.status}</span></div><p className="font-black text-slate-400 text-sm mt-1">{selectedPartner.phoneNumber}</p><div className="flex items-center gap-2 mt-3"><Star size={14} className="fill-amber-400 text-amber-400" /><span className="text-xs font-black italic">4.0 (1 Reviews)</span></div></div>
+                </div>
+                <div className="h-20 w-px bg-slate-100"></div>
+                <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3 italic">Current Job</p><p className="font-black text-slate-800 text-sm">#BK-2026-0804-0567</p><p className="text-xs font-bold text-slate-500 mt-1 italic">Light Fitting at Adajan</p><button className="text-[10px] font-black text-indigo-600 mt-3 flex items-center gap-1 uppercase underline underline-offset-4">View Details</button></div>
+                <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3 italic">Location</p><p className="font-black text-slate-800 text-sm tracking-widest">21.1950, 72.8311</p><p className="text-xs font-bold text-slate-500 mt-1 italic uppercase tracking-tighter text-emerald-500">0.5 km from job location</p></div>
+                <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mb-3 italic">Update Pulse</p><p className="font-black text-slate-800 text-sm italic">2 mins ago</p><p className="text-xs font-bold text-slate-500 mt-1 italic opacity-40">16 Aug 2026, 04:34 PM</p></div>
+                <div className="flex flex-col gap-2"><button className="px-10 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-[22px] font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3 border border-indigo-100"><MapPin size={16}/> View Map</button><button className="px-10 py-3 bg-white hover:bg-slate-900 hover:text-white text-slate-800 border-2 border-slate-100 rounded-[22px] font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3"><Phone size={16}/> Contact</button></div>
+            </div>
+        )}
     </div>
+  );
+};
+
+const SummaryCard = ({ label, value, sub, color="text-slate-900" }) => (
+    <div className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm min-w-[180px] text-center"><p className="text-[9px] font-black text-slate-400 uppercase tracking-[4px] mb-2 italic opacity-60">{label}</p><div className="flex flex-col items-center"><p className={`text-4xl font-black italic tracking-tighter leading-none ${color}`}>{value}</p><p className="text-[9px] font-bold text-slate-300 italic uppercase mt-2">{sub}</p></div></div>
 );
 
-const StatusPill = ({ color, label, count }) => (
-    <div className="px-6 py-3 bg-white border border-slate-100 rounded-full shadow-sm flex items-center gap-3"><div className={`w-2 h-2 rounded-full ${color}`}></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span><span className="text-sm font-black text-slate-900">{count}</span></div>
+const Legend = ({ color, label }) => (
+    <div className="flex items-center gap-2.5"><div className={`w-3 h-3 rounded-full ${color}`}></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{label}</span></div>
 );
 
 const AnalyticsView = ({ data }) => !data ? null : (
   <div className="space-y-12 animate-in fade-in duration-200">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-        <StatCard title="Global Consumers" value={data.totalUsers} color="text-indigo-600" />
+        <StatCard title="Total Consumers" value={data.totalUsers} color="text-indigo-600" />
         <StatCard title="Active Partners" value={data.totalProviders} color="text-emerald-600" />
         <StatCard title="Total Revenue" value={`₹${data.totalRevenue?.toLocaleString()}`} color="text-slate-900" />
         <StatCard title="Ops Completed" value={data.totalBookings} color="text-blue-600" />
@@ -311,7 +327,7 @@ const AnalyticsView = ({ data }) => !data ? null : (
               {data.categories?.map((cat, i) => (
                   <div key={i}>
                       <div className="flex justify-between items-end mb-3"><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px]">{cat.name}</p><p className="text-2xl font-black text-indigo-600 italic tracking-tighter">{Math.round(cat.ratio * 100)}%</p></div>
-                      <div className="w-full bg-slate-50 rounded-full h-2.5 overflow-hidden border border-slate-100"><div className="bg-indigo-500 h-full rounded-full transition-all duration-1000 shadow-lg shadow-indigo-100" style={{ width: `${cat.ratio * 100}%` }}></div></div>
+                      <div className="w-full bg-slate-50 rounded-full h-2.5 overflow-hidden border border-slate-100 shadow-inner"><div className="bg-indigo-500 h-full rounded-full transition-all duration-1000 shadow-lg shadow-indigo-100" style={{ width: `${cat.ratio * 100}%` }}></div></div>
                   </div>
               ))}
           </div>
@@ -375,18 +391,18 @@ const PendingView = ({ providers, onApprove }) => (
 
 const WithdrawalsTable = ({ withdrawals, onHandle }) => (
   <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden animate-in fade-in duration-200">
-    <div className="px-10 py-8 border-b border-slate-50 font-black text-slate-800 text-xs uppercase tracking-[8px] italic bg-white">Partner Liquidation Request Queue</div>
+    <div className="px-10 py-8 border-b border-slate-50 font-black text-slate-800 text-xs uppercase tracking-[8px] italic bg-white text-center">Financial Clearance Gateway</div>
     <div className="overflow-x-auto">
       <table className="w-full text-left">
-        <thead><tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[4px]"><th className="px-12 py-8">Account Identity</th><th className="px-12 py-8 text-right">Liquidation Authorization</th></tr></thead>
+        <thead><tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[4px]"><th className="px-12 py-8">Account Identity</th><th className="px-12 py-8 text-right">Liquidation Status</th></tr></thead>
         <tbody className="divide-y divide-slate-50">
           {withdrawals.length === 0 ? (
-            <tr><td colSpan="2" className="px-10 py-32 text-center text-slate-200 italic font-black uppercase tracking-[10px] text-xs animate-pulse">Waiting for Liquidation Events</td></tr>
+            <tr><td colSpan="2" className="px-10 py-32 text-center text-slate-200 italic font-black uppercase tracking-[10px] text-xs">Waiting for events</td></tr>
           ) : (
             withdrawals.map(w => (
               <tr key={w._id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-12 py-10 font-black text-slate-800 uppercase tracking-tighter text-2xl italic leading-none">{w.providerName}</td>
-                <td className="px-12 py-10 text-right space-x-6"><span className="text-indigo-600 font-black italic text-3xl tracking-tighter mr-6">₹{w.amount}</span><button onClick={()=>onHandle(w._id, 'approved')} className="px-10 py-4 bg-slate-900 text-white text-[10px] font-black rounded-[22px] uppercase tracking-[4px] shadow-2xl transition-all hover:bg-indigo-600 hover:-translate-y-1 active:scale-95">Release Assets</button></td>
+                <td className="px-12 py-10 text-right space-x-6"><span className="text-indigo-600 font-black italic text-3xl tracking-tighter mr-6">₹{w.amount}</span><button onClick={()=>onHandle(w._id, 'approved')} className="px-10 py-4 bg-slate-900 text-white text-[10px] font-black rounded-[22px] uppercase tracking-[4px] shadow-2xl transition-all hover:bg-indigo-600 active:scale-95">Authorize Payment</button></td>
               </tr>
             ))
           )}
@@ -403,11 +419,11 @@ const JobsTable = ({ jobs, title }) => (
       <thead><tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[4px] border-b border-slate-50"><th className="px-12 py-8">Mission Package</th><th className="px-12 py-8">Deployment State</th><th className="px-12 py-8 text-right">Asset Valuation</th></tr></thead>
       <tbody className="divide-y divide-slate-50">
         {(!jobs || jobs.length === 0) ? (
-          <tr><td colSpan="3" className="px-10 py-40 text-center text-slate-100 italic font-black uppercase tracking-[20px]">Null Set</td></tr>
+          <tr><td colSpan="3" className="px-10 py-40 text-center text-slate-100 italic font-black uppercase tracking-[20px]">Archive Empty</td></tr>
         ) : (
           jobs.map(j => (
             <tr key={j._id} className="hover:bg-slate-50/50 transition-colors group">
-              <td className="px-12 py-10"><p className="font-black text-slate-800 uppercase tracking-tighter text-2xl italic leading-none group-hover:text-indigo-600 transition-colors">{j.serviceName}</p><p className="text-[9px] font-black text-slate-300 uppercase tracking-[3px] mt-2 italic">{new Date(j.createdAt).toLocaleString()}</p></td>
+              <td className="px-12 py-10"><p className="font-black text-slate-800 uppercase tracking-tighter text-2xl italic leading-none group-hover:text-indigo-600 transition-colors">{j.serviceName}</p><p className="text-[9px] font-black text-slate-300 uppercase tracking-[3px] mt-2 italic">{new Date(j.createdAt).toLocaleDateString()}</p></td>
               <td className="px-12 py-10"><span className={`px-6 py-2 rounded-full text-[10px] font-black uppercase border-2 transition-all shadow-lg italic ${j.status === 'done' ? 'bg-emerald-50 border-emerald-100 text-emerald-500 shadow-emerald-50' : 'bg-indigo-50 border-indigo-100 text-indigo-500 shadow-indigo-50'}`}>{j.status.replace('_',' ')}</span></td>
               <td className="px-12 py-10 text-right font-black text-4xl italic tracking-tighter text-slate-900 opacity-80 group-hover:opacity-100">₹{j.totalAmount}</td>
             </tr>
@@ -424,11 +440,11 @@ const CategoriesView = ({ categories, refresh }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 animate-in fade-in duration-200">
       <div className="bg-[#0F172A] p-12 rounded-[50px] shadow-2xl h-fit border border-white/5 relative overflow-hidden text-center">
-        <h3 className="font-black mb-12 uppercase text-[10px] tracking-[6px] text-indigo-400 italic">Initialize Core Asset</h3>
+        <h3 className="font-black mb-12 uppercase text-[10px] tracking-[6px] text-indigo-400 italic">Core Asset Setup</h3>
         <div className="space-y-8">
-            <input value={n} onChange={e=>setN(e.target.value)} placeholder="VECTOR_NAME" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-black text-white outline-none focus:border-indigo-500 uppercase tracking-widest text-xs shadow-inner" />
-            <input value={i} onChange={e=>setI(e.target.value)} placeholder="URI_LOCATION" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-bold text-white outline-none focus:border-indigo-500 text-xs shadow-inner" />
-            <button onClick={handleAdd} className="w-full py-7 bg-indigo-600 text-white font-black rounded-[35px] uppercase text-xs tracking-[8px] shadow-2xl shadow-indigo-900/50 hover:bg-white hover:text-indigo-600 transition-all active:scale-95">Deploy Module</button>
+            <input value={n} onChange={e=>setN(e.target.value)} placeholder="VECTOR_NAME" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-black text-white outline-none focus:border-indigo-500 uppercase tracking-widest text-xs" />
+            <input value={i} onChange={e=>setI(e.target.value)} placeholder="URI_LOCATION" className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-[28px] font-bold text-white outline-none focus:border-indigo-500 text-xs" />
+            <button onClick={handleAdd} className="w-full py-7 bg-indigo-600 text-white font-black rounded-[35px] uppercase text-xs tracking-[8px] shadow-2xl shadow-indigo-900/50 hover:bg-white hover:text-indigo-600 transition-all">Deploy Module</button>
         </div>
       </div>
       <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-8">
@@ -445,8 +461,8 @@ const CategoriesView = ({ categories, refresh }) => {
 };
 
 const ReportsView = ({ reports }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-200 text-left">
-    {reports.length === 0 ? <div className="col-span-full p-60 bg-white rounded-[70px] border-4 border-dashed border-slate-50 text-center text-slate-100 font-black uppercase tracking-[40px] italic">NOMINAL</div> : reports.map(r => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-200">
+    {reports.length === 0 ? <div className="col-span-full p-60 bg-white rounded-[70px] border-4 border-dashed border-slate-50 text-center text-slate-100 font-black uppercase tracking-[40px] italic">STATUS NOMINAL</div> : reports.map(r => (
       <div key={r._id} className="bg-white p-12 rounded-[60px] border-l-[20px] border-red-500 shadow-2xl relative overflow-hidden group hover:shadow-red-100 transition-all duration-500">
         <div className="absolute top-0 right-0 px-8 py-3 bg-red-600 text-white text-[10px] font-black uppercase rounded-bl-[35px] tracking-[6px] shadow-2xl">{r.status}</div>
         <h4 className="font-black text-slate-900 uppercase text-2xl tracking-tighter mb-8 italic">Incident: {r.reason}</h4>
@@ -463,10 +479,10 @@ const ReportsView = ({ reports }) => (
 
 const ReviewsView = ({ reviews, onDelete }) => (
   <div className="bg-white rounded-[60px] border border-slate-100 shadow-sm overflow-hidden text-left animate-in fade-in duration-200">
-    <div className="px-12 py-10 border-b border-slate-50 bg-white font-black text-slate-800 text-[10px] uppercase tracking-[12px] italic text-center opacity-40">Sentiment Analysis Registry</div>
+    <div className="px-12 py-10 border-b border-slate-50 bg-white font-black text-slate-800 text-[10px] uppercase tracking-[12px] italic text-center opacity-40">Intelligence Registry</div>
     <div className="overflow-x-auto">
       <table className="w-full">
-        <thead><tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[6px] border-b border-slate-50"><th className="px-12 py-8">Reviewer Authority</th><th className="px-12 py-8 text-left">Analytical Debrief</th><th className="px-12 py-8 text-right">System Control</th></tr></thead>
+        <thead><tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-[6px] border-b border-slate-50"><th className="px-12 py-8">Reviewer</th><th className="px-12 py-8 text-left">Analysis</th><th className="px-12 py-8 text-right">System Control</th></tr></thead>
         <tbody className="divide-y divide-slate-50">
           {reviews.map(r => (
             <tr key={r._id} className="hover:bg-slate-50/50 transition-all group">
@@ -475,7 +491,7 @@ const ReviewsView = ({ reviews, onDelete }) => (
                       {[...Array(5)].map((_, i) => <Star key={i} size={16} className={i < r.rating ? 'text-amber-400 fill-amber-400 drop-shadow-xl' : 'text-slate-100'} />)}
                   </div>
               </td>
-              <td className="px-12 py-12"><div className="p-8 bg-slate-50 rounded-[45px] border border-slate-100 shadow-inner italic font-bold text-slate-500 text-lg leading-relaxed group-hover:bg-white transition-colors duration-300 shadow-[inset_0_4px_10px_rgba(0,0,0,0.02)]">"{r.comment}"</div></td>
+              <td className="px-12 py-12"><div className="p-8 bg-slate-50 rounded-[45px] border border-slate-100 shadow-inner italic font-bold text-slate-500 text-lg leading-relaxed">"{r.comment}"</div></td>
               <td className="px-12 py-12 text-right"><button onClick={()=>onDelete(r._id)} className="p-8 bg-red-50 text-red-400 rounded-[45px] hover:bg-red-600 hover:text-white transition-all shadow-xl active:scale-90 hover:rotate-12 duration-300"><Trash2 size={32}/></button></td>
             </tr>
           ))}
@@ -490,15 +506,15 @@ const SettingsView = ({ settings, refresh }) => {
   return (
     <div className="bg-[#0F172A] p-20 rounded-[80px] border-[12px] border-white/5 max-w-4xl shadow-[0_80px_200px_-50px_rgba(0,0,0,0.6)] relative overflow-hidden group animate-in fade-in duration-200 mx-auto">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full -mr-[250px] -mt-[250px] blur-[150px] group-hover:bg-indigo-500/10 transition-all duration-1000"></div>
-      <h3 className="font-black uppercase text-[11px] tracking-[15px] mb-20 text-indigo-500 italic text-center">Central Logic Core</h3>
+      <h3 className="font-black uppercase text-[11px] tracking-[15px] mb-20 text-indigo-500 italic text-center">Global Platform Logic Core</h3>
       <div className="flex justify-between items-center mb-20 relative z-10 text-white uppercase font-black text-5xl tracking-tighter italic">
-          <div className="space-y-4"><p className="leading-none">Revenue Friction</p><p className="text-slate-600 text-sm font-black tracking-[4px] normal-case opacity-80 leading-relaxed border-l-4 border-indigo-600 pl-6">Platform retainment factor per transaction node.</p></div>
+          <div className="space-y-4"><p className="leading-none">Revenue Friction</p><p className="text-slate-600 text-sm font-black tracking-[4px] normal-case opacity-80 leading-relaxed border-l-4 border-indigo-600 pl-6 text-left">Platform retainment factor per transaction node.</p></div>
           <div className="flex items-center space-x-8 bg-white/5 p-12 rounded-[60px] border-2 border-white/10 shadow-[0_30px_100px_rgba(0,0,0,0.4)] hover:border-indigo-500/30 transition-all duration-500 group/input">
               <input type="number" value={c} onChange={e=>setC(e.target.value)} className="w-40 h-40 text-center bg-transparent font-black text-8xl text-indigo-500 outline-none placeholder-indigo-900 group-hover/input:scale-110 transition-transform duration-500" />
               <span className="font-black text-white/5 text-[140px] italic select-none leading-none">%</span>
           </div>
       </div>
-      <button onClick={()=>adminApi.updateSetting('commission_percentage', c).then(()=>showToast('Core Synced'))} className="w-full py-10 bg-indigo-600 text-white font-black rounded-[45px] uppercase text-sm tracking-[12px] shadow-[0_40px_100px_rgba(79,70,229,0.4)] hover:bg-white hover:text-indigo-600 hover:-translate-y-4 active:scale-95 transition-all duration-500 relative z-10 italic">SYNCHRONIZE UNIVERSAL ENGINE</button>
+      <button onClick={()=>adminApi.updateSetting('commission_percentage', c).then(()=>showToast('Logic Updated'))} className="w-full py-10 bg-indigo-600 text-white font-black rounded-[45px] uppercase text-sm tracking-[12px] shadow-[0_40px_100px_rgba(79,70,229,0.4)] hover:bg-white hover:text-indigo-600 hover:-translate-y-4 active:scale-95 transition-all duration-500 relative z-10 italic">SYNCHRONIZE UNIVERSAL ENGINE</button>
     </div>
   );
 };
