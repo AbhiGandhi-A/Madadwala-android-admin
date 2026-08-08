@@ -2,6 +2,7 @@ package com.abhi.madadwala_1.ui.screens.provider
 
 import android.annotation.SuppressLint
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -75,6 +76,10 @@ fun ProviderActiveJobScreen(
     var booking by remember { mutableStateOf<BookingResponse?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var showChatSheet by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showChatSheet) {
+        showChatSheet = false
+    }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     

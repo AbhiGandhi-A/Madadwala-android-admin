@@ -1,5 +1,6 @@
 package com.abhi.madadwala_1.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -70,6 +71,12 @@ fun OnboardingScreen(onFinish: () -> Unit) {
 
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
+
+    BackHandler(enabled = pagerState.currentPage > 0) {
+        scope.launch {
+            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+        }
+    }
 
     Scaffold(
         containerColor = MadadwalaColors.Cream,

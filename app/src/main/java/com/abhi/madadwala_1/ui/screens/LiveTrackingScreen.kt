@@ -1,6 +1,7 @@
 package com.abhi.madadwala_1.ui.screens
 
 import android.location.Location
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -70,6 +71,11 @@ fun LiveTrackingScreen(
     var lastKnownOtp by remember { mutableStateOf<String?>(null) }
     var showDetailsSheet by remember { mutableStateOf(false) }
     var showChatSheet by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showDetailsSheet || showChatSheet) {
+        showDetailsSheet = false
+        showChatSheet = false
+    }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     

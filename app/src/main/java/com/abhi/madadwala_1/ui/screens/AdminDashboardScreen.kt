@@ -51,6 +51,10 @@ import kotlinx.coroutines.delay
 fun AdminDashboardScreen(onLogout: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(1) }
 
+    BackHandler(enabled = selectedTab != 1) {
+        selectedTab = 1
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -132,6 +136,10 @@ fun WithdrawalsTab() {
     }
 
     LaunchedEffect(Unit) { fetch() }
+
+    BackHandler(enabled = showRejectDialog != null) {
+        showRejectDialog = null
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (isLoading) {
@@ -659,6 +667,13 @@ fun ManagementTab() {
     var showBannerList by remember { mutableStateOf(false) }
     var showCategoryList by remember { mutableStateOf(false) }
     var showCommissionDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showOfferList || showBannerList || showCategoryList || showCommissionDialog) {
+        showOfferList = false
+        showBannerList = false
+        showCategoryList = false
+        showCommissionDialog = false
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("System Management", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black))
@@ -1211,6 +1226,10 @@ fun SupportChatTab() {
     }
 
     LaunchedEffect(Unit) { fetch() }
+
+    BackHandler(enabled = selectedChat != null) {
+        selectedChat = null
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (isLoading && chats.isEmpty()) {

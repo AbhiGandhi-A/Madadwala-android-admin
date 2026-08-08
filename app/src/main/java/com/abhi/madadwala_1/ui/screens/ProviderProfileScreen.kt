@@ -3,6 +3,7 @@ package com.abhi.madadwala_1.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -76,6 +77,13 @@ fun ProviderProfileScreen(
     var showAllReviews by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showAllServices || showAllReviews || showMenu || showReportDialog) {
+        showAllServices = false
+        showAllReviews = false
+        showMenu = false
+        showReportDialog = false
+    }
 
     LaunchedEffect(providerUid) {
         scope.launch {

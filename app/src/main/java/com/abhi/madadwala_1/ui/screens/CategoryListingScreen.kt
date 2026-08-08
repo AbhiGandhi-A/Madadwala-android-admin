@@ -1,6 +1,7 @@
 package com.abhi.madadwala_1.ui.screens
 
 import android.location.Location
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -58,6 +59,17 @@ fun CategoryListingScreen(
     var filterOption by remember { mutableStateOf("Default") }
     var showFilterMenu by remember { mutableStateOf(false) }
     var showLocationPicker by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isSearching || showFilterMenu || showLocationPicker) {
+        if (isSearching) {
+            isSearching = false
+            searchQuery = ""
+        } else if (showFilterMenu) {
+            showFilterMenu = false
+        } else if (showLocationPicker) {
+            showLocationPicker = false
+        }
+    }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current

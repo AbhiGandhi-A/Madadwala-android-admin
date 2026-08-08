@@ -1,6 +1,7 @@
 package com.abhi.madadwala_1.ui.screens
 
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -88,6 +89,10 @@ fun BookingFlowScreen(
 
     var currentStep by remember { mutableIntStateOf(1) }
     val totalSteps = 4
+
+    BackHandler(enabled = currentStep > 1) {
+        currentStep--
+    }
     val scope = rememberCoroutineScope()
     var isSubmitting by remember { mutableStateOf(false) }
 

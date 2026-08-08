@@ -2,6 +2,7 @@ package com.abhi.madadwala_1.ui.screens
 
 import android.annotation.SuppressLint
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -136,6 +137,14 @@ fun HomeScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var showLocationPicker by remember { mutableStateOf(false) }
     var activeChatBookingId by remember { mutableStateOf<String?>(null) }
+
+    BackHandler(enabled = selectedTab != 0 || showLocationPicker) {
+        if (showLocationPicker) {
+            showLocationPicker = false
+        } else {
+            selectedTab = 0
+        }
+    }
 
     // Hoisted Home Tab Data
     var categories by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.CategoryResponse>>(emptyList()) }

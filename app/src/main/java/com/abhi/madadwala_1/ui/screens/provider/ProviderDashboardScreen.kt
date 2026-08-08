@@ -88,6 +88,10 @@ fun ProviderDashboardScreen(
     val dashboardState by viewModel.dashboardState.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
     var subScreen by remember { mutableStateOf<String?>(null) }
+
+    BackHandler(enabled = selectedTab != 0) {
+        selectedTab = 0
+    }
     var activeChatBookingId by remember { mutableStateOf<String?>(null) }
     val isOnline by viewModel.isOnline.collectAsState()
     
