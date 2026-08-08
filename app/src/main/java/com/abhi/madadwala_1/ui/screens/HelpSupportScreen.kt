@@ -11,8 +11,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.SupportAgent
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,52 +46,17 @@ fun HelpSupportScreen(onBack: () -> Unit) {
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     
-    // Bot Question State
-    var currentBotOptions by remember { mutableStateOf(getInitialBotQuestions()) }
-    var botBreadcrumb by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    LaunchedEffect(user?.uid) {
-        user?.uid?.let {
-            supportViewModel.loadMessages(it)
-            supportViewModel.startPolling(it)
-        }
-    }
-
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
-    }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.size(40.dp).clip(CircleShape).background(MadadwalaColors.Green.copy(alpha = 0.1f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.SupportAgent, null, tint = MadadwalaColors.Green)
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text("Support Chat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(
-                                when(supportState) {
-                                    SupportState.Bot -> "Self Help"
-                                    SupportState.Waiting -> "Waiting for Agent..."
-                                    SupportState.Active -> "Agent Online"
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (supportState == SupportState.Active) Color(0xFF4CAF50) else Color.Gray
-                            )
-                        }
-                    }
+                    Text("Help & Support", fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MadadwalaColors.Ink)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -99,115 +65,271 @@ fun HelpSupportScreen(onBack: () -> Unit) {
         containerColor = MadadwalaColors.Cream
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(messages) { message ->
-                    val isMe = message.senderUid == user?.uid
-                    ChatBubble(message = message, isMe = isMe)
+            TabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = Color.White,
+                contentColor = MadadwalaColors.Green,
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                        color = MadadwalaColors.Green
+                    )
                 }
+            ) {
+                Tab(
+                    selected = selectedTabIndex == 0,
+                    onClick = { selectedTabIndex = 0 },
+                    text = { Text("FAQs", fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal) }
+                )
+                Tab(
+                    selected = selectedTabIndex == 1,
+                    onClick = { selectedTabIndex = 1 },
+                    text = { Text("Chat Support", fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal) }
+                )
+            }
 
-                if (supportState == SupportState.Bot) {
-                    item {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = if (botBreadcrumb.isEmpty()) "How can we help you?" else "Related to ${botBreadcrumb.last()}:",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MadadwalaColors.Green
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            
-                            currentBotOptions.forEach { option ->
-                                Button(
-                                    onClick = {
-                                        user?.let { u ->
-                                            if (option.label == "Chat with agent") {
-                                                supportViewModel.requestAgent(u.uid)
-                                            } else if (option.subOptions.isNotEmpty()) {
-                                                supportViewModel.sendMessage(u.uid, u.name ?: "User", option.label)
-                                                currentBotOptions = option.subOptions
-                                                botBreadcrumb = botBreadcrumb + option.label
-                                            } else {
-                                                supportViewModel.sendMessage(u.uid, u.name ?: "User", option.label)
-                                                currentBotOptions = listOf(
-                                                    BotOption("Chat with agent"),
-                                                    BotOption("Go back", isBack = true)
-                                                )
-                                            }
+            if (selectedTabIndex == 0) {
+                FAQContent()
+            } else {
+                ChatSupportContent(
+                    supportViewModel = supportViewModel,
+                    user = user,
+                    messages = messages,
+                    supportState = supportState,
+                    listState = listState
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FAQContent() {
+    val faqs = listOf(
+        FAQItem("How to book a service?", "You can book a service by selecting a category from the home screen, choosing a provider, and following the 4-step booking flow."),
+        FAQItem("What are the payment methods?", "We support Online Payment (UPI, Cards, NetBanking), Wallet, and Cash after service."),
+        FAQItem("How can I cancel my booking?", "Go to your active booking details and click on the 'Cancel' button. Refunds for paid bookings are processed to your wallet instantly."),
+        FAQItem("How do I contact the provider?", "Once a booking is accepted, you can use the 'Call' or 'Chat' buttons in the booking details to reach the provider."),
+        FAQItem("Is Madadwala safe?", "Yes, all our service providers are background-verified and we provide 24/7 support for any concerns."),
+        FAQItem("How to add money to wallet?", "Go to the 'Wallet' tab and click 'Add Money'. You can use UPI or any other online method to top up your wallet."),
+        FAQItem("What if the work is not done properly?", "You can raise a concern via the 'Chat Support' tab or report the provider from their profile. We'll ensure it's resolved.")
+    )
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text(
+                "Frequently Asked Questions",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Black,
+                color = MadadwalaColors.Green,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+        items(faqs) { faq ->
+            FAQExpandableCard(faq)
+        }
+    }
+}
+
+@Composable
+fun FAQExpandableCard(faq: FAQItem) {
+    var expanded by remember { mutableStateOf(false) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
+        onClick = { expanded = !expanded }
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = faq.question,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MadadwalaColors.Ink,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MadadwalaColors.Green
+                )
+            }
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = faq.answer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MadadwalaColors.Gray,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    }
+}
+
+data class FAQItem(val question: String, val answer: String)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatSupportContent(
+    supportViewModel: SupportViewModel,
+    user: com.abhi.madadwala_1.data.remote.UserResponse?,
+    messages: List<SupportMessage>,
+    supportState: SupportState,
+    listState: androidx.compose.foundation.lazy.LazyListState
+) {
+    var messageText by remember { mutableStateOf("") }
+    var currentBotOptions by remember { mutableStateOf(getInitialBotQuestions()) }
+    var botBreadcrumb by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Support Header
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.White,
+            tonalElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(MadadwalaColors.Green.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.SupportAgent, null, tint = MadadwalaColors.Green)
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("Executive Support", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        when(supportState) {
+                            SupportState.Bot -> "Self Help Bot"
+                            SupportState.Waiting -> "Connecting to Agent..."
+                            SupportState.Active -> "Agent Online"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (supportState == SupportState.Active) Color(0xFF4CAF50) else Color.Gray
+                    )
+                }
+            }
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(messages) { message ->
+                val isMe = message.senderUid == user?.uid
+                ChatBubble(message = message, isMe = isMe)
+            }
+
+            if (supportState == SupportState.Bot) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (botBreadcrumb.isEmpty()) "Quick Help" else "Related to ${botBreadcrumb.last()}:",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MadadwalaColors.Green
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        currentBotOptions.forEach { option ->
+                            Button(
+                                onClick = {
+                                    user?.let { u ->
+                                        if (option.label == "Raise a Ticket" || option.label == "Chat with agent") {
+                                            supportViewModel.requestAgent(u.uid)
+                                        } else if (option.subOptions.isNotEmpty()) {
+                                            supportViewModel.sendMessage(u.uid, u.name ?: "User", option.label)
+                                            currentBotOptions = option.subOptions
+                                            botBreadcrumb = botBreadcrumb + option.label
+                                        } else {
+                                            supportViewModel.sendMessage(u.uid, u.name ?: "User", option.label)
+                                            currentBotOptions = listOf(
+                                                BotOption("Raise a Ticket"),
+                                                BotOption("Go back", isBack = true)
+                                            )
                                         }
-                                    },
-                                    modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth(0.9f),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MadadwalaColors.Green.copy(alpha = 0.12f),
-                                        contentColor = MadadwalaColors.Green
-                                    ),
-                                    border = BorderStroke(1.5.dp, MadadwalaColors.Green)
-                                ) {
-                                    Text(
-                                        text = option.label,
-                                        color = MadadwalaColors.Green,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 4.dp)
-                                    )
-                                }
+                                    }
+                                },
+                                modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth(0.85f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.White,
+                                    contentColor = MadadwalaColors.Green
+                                ),
+                                border = BorderStroke(1.dp, MadadwalaColors.Green.copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = option.label,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
-                            
-                            if (botBreadcrumb.isNotEmpty()) {
-                                TextButton(onClick = {
-                                    currentBotOptions = getInitialBotQuestions()
-                                    botBreadcrumb = emptyList()
-                                }) {
-                                    Text("Back to main menu", color = Color.Gray)
-                                }
+                        }
+                        
+                        if (botBreadcrumb.isNotEmpty()) {
+                            TextButton(onClick = {
+                                currentBotOptions = getInitialBotQuestions()
+                                botBreadcrumb = emptyList()
+                            }) {
+                                Text("Back to main menu", color = Color.Gray, fontSize = 12.sp)
                             }
                         }
                     }
                 }
             }
+        }
 
-            // Input Bar
-            Surface(tonalElevation = 8.dp, color = Color.White, modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextField(
-                        value = messageText,
-                        onValueChange = { messageText = it },
-                        placeholder = { Text("Type your query...") },
-                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MadadwalaColors.LightGray.copy(alpha = 0.3f),
-                            unfocusedContainerColor = MadadwalaColors.LightGray.copy(alpha = 0.3f),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        )
+        // Input Bar
+        Surface(tonalElevation = 8.dp, color = Color.White, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("Describe your issue...") },
+                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MadadwalaColors.LightGray.copy(alpha = 0.3f),
+                        unfocusedContainerColor = MadadwalaColors.LightGray.copy(alpha = 0.3f),
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(
-                        onClick = {
-                            if (messageText.isNotBlank()) {
-                                user?.let { u ->
-                                    supportViewModel.sendMessage(u.uid, u.name ?: "User", messageText)
-                                    if (supportState == SupportState.Bot) supportViewModel.requestAgent(u.uid)
-                                    messageText = ""
-                                }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (messageText.isNotBlank()) {
+                            user?.let { u ->
+                                supportViewModel.sendMessage(u.uid, u.name ?: "User", messageText)
+                                if (supportState == SupportState.Bot) supportViewModel.requestAgent(u.uid)
+                                messageText = ""
                             }
-                        },
-                        modifier = Modifier.size(48.dp).background(MadadwalaColors.Green, CircleShape)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, null, tint = Color.White)
-                    }
+                        }
+                    },
+                    modifier = Modifier.size(48.dp).background(MadadwalaColors.Green, CircleShape)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null, tint = Color.White)
                 }
             }
         }
@@ -225,22 +347,22 @@ fun getInitialBotQuestions() = listOf(
         BotOption("Tracking is not moving"),
         BotOption("Provider is late"),
         BotOption("Cancel my booking"),
-        BotOption("Chat with agent")
+        BotOption("Raise a Ticket")
     )),
     BotOption("Payment & Wallet", listOf(
         BotOption("Money not added to wallet"),
         BotOption("Double payment done"),
         BotOption("Refund status"),
-        BotOption("Chat with agent")
+        BotOption("Raise a Ticket")
     )),
     BotOption("Service Issues", listOf(
         BotOption("Work not done properly"),
         BotOption("Provider was rude"),
         BotOption("Safety concern"),
-        BotOption("Chat with agent")
+        BotOption("Raise a Ticket")
     )),
     BotOption("Something else", listOf(
-        BotOption("Chat with agent")
+        BotOption("Raise a Ticket")
     ))
 )
 

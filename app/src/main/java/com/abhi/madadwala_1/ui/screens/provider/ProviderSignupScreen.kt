@@ -42,6 +42,7 @@ fun ProviderSignupScreen(
     var email by remember { mutableStateOf("") }
     var experience by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
+    var referralCode by remember { mutableStateOf<String?>(null) }
     
     var aadhaarNumber by remember { mutableStateOf("") }
     var aadhaarFrontUri by remember { mutableStateOf<Uri?>(null) }
@@ -101,12 +102,13 @@ fun ProviderSignupScreen(
                 when (step) {
                     1 -> ProviderStep1(
                         phoneNumber = phoneNumber,
-                        onNext = { cat, n, e, exp, addr ->
+                        onNext = { cat, n, e, exp, addr, ref ->
                             selectedCategory = cat
                             name = n
                             email = e
                             experience = exp
                             address = addr
+                            referralCode = ref
                             currentStep = 2
                         }
                     )
@@ -145,6 +147,7 @@ fun ProviderSignupScreen(
                                 category = selectedCategory,
                                 profession = selectedCategory, // Use category as profession for now
                                 aadhaarNumber = aadhaarNumber,
+                                referralCode = referralCode,
                                 profileImageUri = selfieUri,
                                 aadhaarImageUri = aadhaarFrontUri
                             )

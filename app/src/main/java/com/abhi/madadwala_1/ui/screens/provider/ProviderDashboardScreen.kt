@@ -17,6 +17,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.CircleShape
@@ -57,10 +59,16 @@ import com.abhi.madadwala_1.ui.viewmodel.LocationViewModel
 import com.abhi.madadwala_1.ui.viewmodel.ProviderDashboardState
 import com.abhi.madadwala_1.ui.viewmodel.ProviderViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 import com.abhi.madadwala_1.ui.viewmodel.CallViewModel
 
@@ -79,6 +87,8 @@ fun ProviderDashboardScreen(
     val context = LocalContext.current
     val dashboardState by viewModel.dashboardState.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
+    var subScreen by remember { mutableStateOf<String?>(null) }
+    var activeChatBookingId by remember { mutableStateOf<String?>(null) }
     val isOnline by viewModel.isOnline.collectAsState()
     
     val address by locationViewModel.address.collectAsState()
@@ -337,7 +347,13 @@ fun ProviderDashboardScreen(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
                         icon = { Icon(icon, contentDescription = label) },
-                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        label = { 
+                            Text(
+                                text = label, 
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selectedTab == index) MadadwalaColors.Teal else MadadwalaColors.Gray
+                            ) 
+                        },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MadadwalaColors.Teal,
                             selectedTextColor = MadadwalaColors.Teal,
@@ -377,29 +393,38 @@ fun ProviderDashboardScreen(
                                     }
                                 },
                                 onRejectRequest = { viewModel.updateCustomRequestStatus(it, "rejected") },
+                                onCancelBooking = { id, reason -> viewModel.cancelBooking(id, reason) },
                                 onAcceptDirect = { bookingId, time, comment, custId -> 
                                     viewModel.updateBookingStatus(bookingId, "accepted", time, comment)
                                 },
                                 onNavigateToWallet = { selectedTab = 2 },
                                 onNavigateToRatings = { selectedTab = 3 },
                                 onNavigateToBookings = { selectedTab = 1 },
+                                onChat = { activeChatBookingId = it },
                                 callViewModel = callViewModel
                             )
                             1 -> ProviderBookingsTab(
                                 bookings = state.bookings,
                                 onViewDetails = { onNavigateToActiveJob(it) },
                                 onAcceptDirect = { id, time, comment, custId -> viewModel.updateBookingStatus(id, "accepted", time, comment) },
+                                onCancelBooking = { id, reason -> viewModel.cancelBooking(id, reason) },
+                                onChat = { activeChatBookingId = it },
                                 callViewModel = callViewModel
                             )
                             2 -> ProviderPayoutsTab(
                                 balance = state.user.walletBalance,
                                 totalEarned = state.user.totalEarnings ?: 0.0,
-                                transactions = state.transactions
+                                transactions = state.transactions,
+                                onRefresh = { viewModel.loadDashboardData(false) },
+                                onViewWithdrawalHistory = { selectedTab = 3; subScreen = "withdrawals" }
                             )
                             3 -> ProviderProfileTab(
                                 user = state.user,
                                 services = state.services,
+                                reviews = state.reviews,
                                 preferenceManager = preferenceManager,
+                                subScreen = subScreen,
+                                onSubScreenChange = { subScreen = it },
                                 onLogout = onLogout,
                                 onUpdateServicePrice = { id, price -> viewModel.updateServicePrice(id, price) },
                                 onAddService = { name, price -> viewModel.addService(name, price) },
@@ -412,6 +437,13 @@ fun ProviderDashboardScreen(
             }
         }
     }
+
+    activeChatBookingId?.let { bookingId ->
+        com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
+            bookingId = bookingId,
+            onDismiss = { activeChatBookingId = null }
+        )
+    }
 }
 
 @Composable
@@ -423,10 +455,12 @@ fun ProviderHomeTab(
     onViewDetails: (String) -> Unit,
     onSendBid: (String, Double) -> Unit,
     onRejectRequest: (String) -> Unit,
+    onCancelBooking: (String, String) -> Unit,
     onAcceptDirect: (String, String, String?, String?) -> Unit,
     onNavigateToWallet: () -> Unit = {},
     onNavigateToRatings: () -> Unit = {},
     onNavigateToBookings: () -> Unit = {},
+    onChat: (String) -> Unit,
     callViewModel: CallViewModel
 ) {
     val scrollState = rememberLazyListState()
@@ -527,7 +561,7 @@ fun ProviderHomeTab(
                             )
                             StatCard(
                                 label = "${user.reviewCount ?: 0} Ratings", 
-                                value = String.format("%.1f", user.rating ?: 0.0), 
+                                value = String.format(Locale.getDefault(), "%.1f", user.rating ?: 0.0),
                                 icon = Icons.Default.Star,
                                 buttonText = stringResource(R.string.view_ratings),
                                 onClick = onNavigateToRatings,
@@ -548,7 +582,26 @@ fun ProviderHomeTab(
 
             item {
                 Spacer(modifier = Modifier.height(24.dp))
-                PromotionCard()
+                if (user.kycRejected) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable { onNavigateToRatings() }, // Ratings points to profile tab where KYC is
+                        shape = RoundedCornerShape(24.dp),
+                        color = MadadwalaColors.Red.copy(alpha = 0.08f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MadadwalaColors.Red.copy(alpha = 0.2f))
+                    ) {
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, null, tint = MadadwalaColors.Red, modifier = Modifier.size(32.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Registration Rejected", fontWeight = FontWeight.Bold, color = MadadwalaColors.Red)
+                                Text("Click here to update your KYC details and re-apply.", style = MaterialTheme.typography.bodySmall, color = MadadwalaColors.Ink)
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = MadadwalaColors.Red)
+                        }
+                    }
+                } else {
+                    PromotionCard()
+                }
             }
 
             if (!isOnline) {
@@ -610,7 +663,7 @@ fun ProviderHomeTab(
                     Box(modifier = Modifier.padding(vertical = 8.dp)) {
                         CustomJobRequestNotification(
                             request = request,
-                            onAccept = { price -> onSendBid(request._id, price) },
+                            onAccept = { price: Double -> onSendBid(request._id, price) },
                             onReject = { onRejectRequest(request._id) }
                         )
                     }
@@ -683,7 +736,8 @@ fun ProviderHomeTab(
                             booking = booking,
                             onViewDetails = { onViewDetails(booking._id) },
                             onAccept = { time, comment -> onAcceptDirect(booking._id, time, comment, booking.customerUid) },
-                            onCancel = {},
+                            onReject = { reason -> onCancelBooking(booking._id, reason) },
+                            onChat = { onChat(booking._id) },
                             callViewModel = callViewModel
                         )
                     }
@@ -739,6 +793,8 @@ fun ProviderBookingsTab(
     bookings: List<BookingResponse>,
     onViewDetails: (String) -> Unit,
     onAcceptDirect: (String, String, String?, String?) -> Unit,
+    onCancelBooking: (String, String) -> Unit,
+    onChat: (String) -> Unit,
     callViewModel: CallViewModel
 ) {
     var selectedFilter by remember { mutableStateOf("All") }
@@ -843,6 +899,8 @@ fun ProviderBookingsTab(
                         ModernBookingCard(
                             booking = booking,
                             onViewDetails = { onViewDetails(booking._id) },
+                            onReject = { reason -> onCancelBooking(booking._id, reason) },
+                            onChat = { onChat(booking._id) },
                             callViewModel = callViewModel
                         )
                     }
@@ -852,7 +910,7 @@ fun ProviderBookingsTab(
 }
 
 @Composable
-fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<TransactionResponse>) {
+fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<TransactionResponse>, onRefresh: () -> Unit, onViewWithdrawalHistory: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
@@ -877,7 +935,12 @@ fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<
                     balance = balance,
                     walletId = "MW${(auth.currentUser?.uid ?: "000000").takeLast(6).uppercase()}",
                     isVisible = isBalanceVisible,
-                    onToggleVisibility = { isBalanceVisible = !isBalanceVisible },
+                    onToggleVisibility = { 
+                        isBalanceVisible = !isBalanceVisible
+                        if (isBalanceVisible) {
+                            onRefresh()
+                        }
+                    },
                     onAddMoney = { /* TODO: Add money logic */ },
                     onTransactions = { /* Already in transactions list */ }
                 )
@@ -899,9 +962,10 @@ fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<
                         onClick = { showWithdrawDialog = true }
                     )
                     WalletQuickActionItem(
-                        icon = Icons.Default.Assessment,
-                        title = "Earnings",
-                        subtitle = "View your\nperformance"
+                        icon = Icons.Default.History,
+                        title = "History",
+                        subtitle = "Withdrawal\nstatus",
+                        onClick = onViewWithdrawalHistory
                     )
                     WalletQuickActionItem(
                         icon = Icons.Default.VerifiedUser,
@@ -1056,14 +1120,17 @@ fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<
 fun ProviderProfileTab(
     user: UserResponse,
     services: List<ServiceResponse>,
+    reviews: List<ReviewResponse>,
     preferenceManager: PreferenceManager,
+    subScreen: String?,
+    onSubScreenChange: (String?) -> Unit,
     onLogout: () -> Unit,
     onUpdateServicePrice: (String, Double) -> Unit,
     onAddService: (String, Double) -> Unit,
     onUploadImage: (Uri) -> Unit,
     onRefresh: () -> Unit
 ) {
-    var subScreen by remember { mutableStateOf<String?>(null) }
+    var legalContentType by remember { mutableStateOf<String?>(null) }
     
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1074,7 +1141,7 @@ fun ProviderProfileTab(
     }
 
     BackHandler(enabled = subScreen != null) {
-        subScreen = null
+        onSubScreenChange(null)
     }
 
     AnimatedContent(targetState = subScreen, label = "ProfileTransition") { screen ->
@@ -1273,7 +1340,7 @@ fun ProviderProfileTab(
                                     label = stringResource(R.string.kyc_details),
                                     subtext = "View and update your KYC information",
                                     icon = Icons.Default.Badge,
-                                    onClick = { subScreen = "kyc" }
+                                    onClick = { onSubScreenChange("kyc") }
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                                 ProfileOptionV2(
@@ -1286,28 +1353,35 @@ fun ProviderProfileTab(
                                     label = stringResource(R.string.edit_service_charges),
                                     subtext = "Set and update your service charges",
                                     icon = Icons.Default.Payments,
-                                    onClick = { subScreen = "charges" }
+                                    onClick = { onSubScreenChange("charges") }
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                                 ProfileOptionV2(
                                     label = stringResource(R.string.bank_details),
                                     subtext = "Manage your bank account details",
                                     icon = Icons.Default.AccountBalance,
-                                    onClick = { subScreen = "bank" }
+                                    onClick = { onSubScreenChange("bank") }
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                                 ProfileOptionV2(
                                     label = stringResource(R.string.performance),
                                     subtext = "View your performance and analytics",
                                     icon = Icons.Default.Assessment,
-                                    onClick = { subScreen = "performance" }
+                                    onClick = { onSubScreenChange("performance") }
+                                )
+                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
+                                ProfileOptionV2(
+                                    label = stringResource(R.string.my_reviews),
+                                    subtext = "View all your customer reviews and ratings",
+                                    icon = Icons.Default.Star,
+                                    onClick = { onSubScreenChange("reviews") }
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                                 ProfileOptionV2(
                                     label = stringResource(R.string.settings),
                                     subtext = "Manage app preferences and account settings",
                                     icon = Icons.Default.Settings,
-                                    onClick = { subScreen = "settings" }
+                                    onClick = { onSubScreenChange("settings") }
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                                 ProfileOptionV2(
@@ -1319,7 +1393,22 @@ fun ProviderProfileTab(
                                 ProfileOptionV2(
                                     label = "About Madadwala",
                                     subtext = "Terms, policies and app information",
-                                    icon = Icons.Default.Info
+                                    icon = Icons.Default.Info,
+                                    onClick = { legalContentType = "About" }
+                                )
+                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
+                                ProfileOptionV2(
+                                    label = "Terms & Conditions",
+                                    subtext = "Usage terms and legal rules",
+                                    icon = Icons.Default.Description,
+                                    onClick = { legalContentType = "Terms" }
+                                )
+                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
+                                ProfileOptionV2(
+                                    label = "Privacy Policy",
+                                    subtext = "How we handle your data",
+                                    icon = Icons.Default.PrivacyTip,
+                                    onClick = { legalContentType = "Privacy" }
                                 )
                             }
                         }
@@ -1349,18 +1438,96 @@ fun ProviderProfileTab(
                     }
                 }
             }
-            "kyc" -> KycSubScreen(user) { subScreen = null }
-            "bank" -> BankDetailsSubScreen(user.uid, user.bankDetails, onRefresh) { subScreen = null }
-            "performance" -> PerformanceSubScreen(user.uid) { subScreen = null }
-            "settings" -> SettingsSubScreen(preferenceManager) { subScreen = null }
+            "kyc" -> KycSubScreen(user) { onSubScreenChange(null) }
+            "bank" -> BankDetailsSubScreen(user.uid, user.bankDetails, onRefresh) { onSubScreenChange(null) }
+            "performance" -> PerformanceSubScreen(user.uid) { onSubScreenChange(null) }
+            "withdrawals" -> WithdrawalHistorySubScreen(user.uid) { onSubScreenChange(null) }
+            "reviews" -> ReviewsSubScreen(reviews) { onSubScreenChange(null) }
+            "settings" -> SettingsSubScreen(preferenceManager) { onSubScreenChange(null) }
             "charges" -> ChargesEditor(
                 services = services,
-                onBack = { subScreen = null },
+                onBack = { onSubScreenChange(null) },
                 onUpdate = onUpdateServicePrice,
                 onAdd = onAddService
             )
         }
     }
+
+    if (legalContentType != null) {
+        PartnerLegalContentDialog(
+            type = legalContentType!!,
+            onDismiss = { legalContentType = null }
+        )
+    }
+}
+
+@Composable
+fun PartnerLegalContentDialog(type: String, onDismiss: () -> Unit) {
+    val title = when(type) {
+        "About" -> "About Madadwala"
+        "Terms" -> "Terms & Conditions"
+        "Privacy" -> "Privacy Policy"
+        else -> "Information"
+    }
+
+    val content = when(type) {
+        "About" -> """
+            Madadwala is your one-stop solution for all home service needs. We connect you with verified, background-checked professionals for services ranging from plumbing and electrical work to deep cleaning and beauty services.
+            
+            Our mission is to empower local service providers while ensuring homeowners receive top-quality, reliable, and safe services at fair prices.
+            
+            Version: 1.0.4 (Stable)
+            Developed by: Abhi Gandhi
+        """.trimIndent()
+        "Terms" -> """
+            1. Acceptance of Terms: By joining Madadwala as a partner, you agree to follow our professional code of conduct.
+            
+            2. Service Quality: Partners are expected to provide high-quality service. Low ratings may lead to account suspension.
+            
+            3. Commission: A standard commission of 15% is deducted from all booking amounts processed through the platform.
+            
+            4. Payouts: Withdrawal requests are processed within 3-4 hours after approval.
+            
+            5. Safety: Background verification is mandatory for all partners. Any fraudulent activity will be reported to the authorities.
+        """.trimIndent()
+        "Privacy" -> """
+            1. Data Collection: We collect your professional details, Aadhaar information, and live location to assign jobs.
+            
+            2. Data Usage: Your location and profile are shared with customers only when you accept their booking.
+            
+            3. Security: Your sensitive documents and banking details are encrypted and stored securely.
+            
+            4. Third Parties: We do not share your private data with external agencies except for verification purposes.
+            
+            5. Controls: You can manage your profile visibility and availability status directly from the dashboard.
+        """.trimIndent()
+        else -> ""
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = { Text(title, fontWeight = FontWeight.Bold, color = MadadwalaColors.Teal) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MadadwalaColors.Ink,
+                    lineHeight = 22.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable
@@ -1471,17 +1638,142 @@ fun StatMiniItem(
 
 @Composable
 fun KycSubScreen(user: UserResponse, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var newAadhaarNumber by remember { mutableStateOf(user.aadhaarNumber ?: "") }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { selectedImageUri = it }
+
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-            Text("KYC Details", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MadadwalaColors.Ink) }
+            Text("KYC Details", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink)
         }
         Spacer(modifier = Modifier.height(24.dp))
+
+        if (user.kycRejected) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = MadadwalaColors.Red.copy(alpha = 0.05f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MadadwalaColors.Red.copy(alpha = 0.1f))
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Error, null, tint = MadadwalaColors.Red, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Registration Rejected", fontWeight = FontWeight.Bold, color = MadadwalaColors.Red)
+                    }
+                    Text(
+                        text = "Reason: ${user.kycRejectionReason ?: "Information provided was incorrect or blurry."}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MadadwalaColors.Ink.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    Text(
+                        text = "Please update your Aadhaar details below to re-apply.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MadadwalaColors.Gray,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        }
+
         Surface(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), Color.White, tonalElevation = 2.dp) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                KycRow("Aadhaar Number", user.aadhaarNumber ?: "Not Provided")
-                KycRow("Verification Date", user.verificationDate ?: "Pending")
-                KycRow("Status", if (user.isVerified) "Verified" else "Under Review")
+                if (user.kycRejected) {
+                    OutlinedTextField(
+                        value = newAadhaarNumber,
+                        onValueChange = { if (it.length <= 12 && it.all { c -> c.isDigit() }) newAadhaarNumber = it },
+                        label = { Text("Aadhaar Number") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MadadwalaColors.Teal,
+                            unfocusedBorderColor = MadadwalaColors.LightGray
+                        )
+                    )
+
+                    Surface(
+                        onClick = { photoPicker.launch("image/*") },
+                        modifier = Modifier.fillMaxWidth().height(150.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MadadwalaColors.Cream.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedImageUri != null) MadadwalaColors.Teal else Color.LightGray)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (selectedImageUri != null) {
+                                AsyncImage(model = selectedImageUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            } else {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.AddPhotoAlternate, null, tint = MadadwalaColors.Teal, modifier = Modifier.size(32.dp))
+                                    Text("Re-upload Aadhaar Image", fontSize = 12.sp, color = MadadwalaColors.Teal)
+                                }
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            if (newAadhaarNumber.length < 12) {
+                                Toast.makeText(context, "Invalid Aadhaar Number", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            isSubmitting = true
+                            scope.launch {
+                                try {
+                                    val aadhaarNoBody = newAadhaarNumber.toRequestBody("text/plain".toMediaTypeOrNull())
+                                    var aadhaarPart: MultipartBody.Part? = null
+                                    
+                                    selectedImageUri?.let { uri ->
+                                        val inputStream = context.contentResolver.openInputStream(uri)
+                                        val file = java.io.File(context.cacheDir, "reupload_aadhaar.jpg")
+                                        inputStream?.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+                                        aadhaarPart = MultipartBody.Part.createFormData("aadhaarImage", file.name, file.asRequestBody("image/*".toMediaTypeOrNull()))
+                                    }
+
+                                    val res = RetrofitClient.apiService.updateKyc(user.uid, aadhaarNoBody, aadhaarPart)
+                                    if (res.isSuccessful) {
+                                        Toast.makeText(context, "KYC details updated. Under review.", Toast.LENGTH_LONG).show()
+                                        onBack()
+                                    } else {
+                                        Toast.makeText(context, "Update failed: ${res.message()}", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                } finally {
+                                    isSubmitting = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal),
+                        enabled = !isSubmitting && (newAadhaarNumber != user.aadhaarNumber || selectedImageUri != null)
+                    ) {
+                        if (isSubmitting) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        else Text("Update & Re-apply", fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    KycRow("Aadhaar Number", user.aadhaarNumber ?: "Not Provided")
+                    KycRow("Verification Date", user.verificationDate ?: "Pending")
+                    KycRow("Status", if (user.isVerified) "Verified" else "Under Review")
+                    
+                    if (!user.isVerified && user.aadhaarImage != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Submitted Aadhaar Card:", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        AsyncImage(
+                            model = user.aadhaarImage,
+                            contentDescription = "Aadhaar",
+                            modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
             }
         }
     }
@@ -1954,13 +2246,16 @@ fun BookingCard(
     booking: BookingResponse, 
     onViewDetails: () -> Unit,
     onAccept: (String, String) -> Unit,
-    onCancel: () -> Unit,
+    onReject: (String) -> Unit,
+    onChat: () -> Unit,
     callViewModel: CallViewModel
 ) {
     val status = booking.status.uppercase()
     var showAcceptDialog by remember { mutableStateOf(false) }
+    var showRejectDialog by remember { mutableStateOf(false) }
     var selectedTime by remember { mutableStateOf(booking.scheduledTime) }
     var partnerComment by remember { mutableStateOf("") }
+    var rejectReason by remember { mutableStateOf("") }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
@@ -2123,7 +2418,7 @@ fun BookingCard(
             if (status == "PENDING" || status == "REQUESTED" || status == "UPCOMING") {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
-                        onClick = onCancel,
+                        onClick = { showRejectDialog = true },
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         border = androidx.compose.foundation.BorderStroke(1.5.dp, MadadwalaColors.Red),
@@ -2193,6 +2488,31 @@ fun BookingCard(
                             )
                         }
                     }
+
+                    Surface(
+                        modifier = Modifier
+                            .height(52.dp)
+                            .weight(0.42f)
+                            .clickable { onChat() },
+                        color = MadadwalaColors.LightGray.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Chat, null, tint = MadadwalaColors.Green, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Chat",
+                                color = MadadwalaColors.Green,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2235,6 +2555,42 @@ fun BookingCard(
             dismissButton = {
                 TextButton(onClick = { showAcceptDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showRejectDialog) {
+        AlertDialog(
+            onDismissRequest = { showRejectDialog = false },
+            title = { Text("Reject Booking", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Please provide a reason for rejecting this booking. This will be shared with the customer.")
+                    OutlinedTextField(
+                        value = rejectReason,
+                        onValueChange = { rejectReason = it },
+                        label = { Text("Reason (Optional)") },
+                        placeholder = { Text("e.g. Too far, already busy") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onReject(rejectReason)
+                        showRejectDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Red)
+                ) {
+                    Text("Confirm & Reject", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRejectDialog = false }) {
+                    Text("Go Back")
                 }
             }
         )
@@ -2372,6 +2728,8 @@ fun FilterChipV2(
 fun ModernBookingCard(
     booking: BookingResponse,
     onViewDetails: () -> Unit,
+    onReject: (String) -> Unit,
+    onChat: () -> Unit,
     callViewModel: CallViewModel
 ) {
     val status = booking.status.uppercase()
@@ -2381,6 +2739,9 @@ fun ModernBookingCard(
     val isArrived = status == "ARRIVED"
     val isCancelled = status == "CANCELLED"
     val isPaid = booking.paymentStatus?.lowercase() == "paid"
+
+    var showRejectDialog by remember { mutableStateOf(false) }
+    var rejectReason by remember { mutableStateOf("") }
 
     val statusColor = when {
         isDone -> Color(0xFF2196F3)      // Blue
@@ -2535,8 +2896,33 @@ fun ModernBookingCard(
                     )
                 }
 
-                Button(
-                    onClick = onViewDetails,
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isPending) {
+                        IconButton(
+                            onClick = { showRejectDialog = true },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(MadadwalaColors.Red.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Reject", tint = MadadwalaColors.Red, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+
+                    if (!isDone && !isCancelled) {
+                        IconButton(
+                            onClick = onChat,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(MadadwalaColors.Green.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                        ) {
+                            Icon(Icons.Default.Chat, contentDescription = "Chat", tint = MadadwalaColors.Green, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    
+                    Button(
+                        onClick = onViewDetails,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isDone) Color.White else Color(0xFF1B3C2D)
                     ),
@@ -2561,6 +2947,43 @@ fun ModernBookingCard(
                 }
             }
         }
+    }
+    }
+
+    if (showRejectDialog) {
+        AlertDialog(
+            onDismissRequest = { showRejectDialog = false },
+            title = { Text("Reject Booking", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Please provide a reason for rejecting this booking.")
+                    OutlinedTextField(
+                        value = rejectReason,
+                        onValueChange = { rejectReason = it },
+                        label = { Text("Reason (Optional)") },
+                        placeholder = { Text("e.g. Too far, already busy") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onReject(rejectReason)
+                        showRejectDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Red)
+                ) {
+                    Text("Confirm & Reject", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRejectDialog = false }) {
+                    Text("Go Back")
+                }
+            }
+        )
     }
 }
 
@@ -2688,6 +3111,313 @@ fun CustomJobRequestNotification(request: CustomRequestResponse, onAccept: (Doub
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Text(if (request.isAutoPrice) "Send Bid" else "Accept", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ReviewsSubScreen(reviews: List<ReviewResponse>, onBack: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MadadwalaColors.Ink) }
+            Text(stringResource(R.string.my_reviews), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink)
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        if (reviews.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Star, null, modifier = Modifier.size(64.dp), tint = MadadwalaColors.LightGray)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("No reviews yet", color = MadadwalaColors.Gray)
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
+            ) {
+                item {
+                    ProviderRatingSummary(reviews = reviews)
+                }
+                
+                item {
+                    Text(
+                        text = "Customer Feedback",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MadadwalaColors.Ink,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+                
+                items(reviews) { review ->
+                    ProviderReviewCard(review)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProviderRatingSummary(reviews: List<ReviewResponse>) {
+    val totalReviews = reviews.size
+    val averageRating = if (totalReviews > 0) reviews.map { it.rating }.average() else 0.0
+    val ratingCounts = reviews.groupingBy { it.rating }.eachCount()
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MadadwalaColors.LightGray.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier.padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(end = 32.dp)
+            ) {
+                Text(
+                    text = String.format("%.1f", averageRating),
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MadadwalaColors.Ink
+                )
+                Row {
+                    repeat(5) { index ->
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = if (index < averageRating.toInt()) MadadwalaColors.Amber else MadadwalaColors.LightGray,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "$totalReviews Reviews",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MadadwalaColors.Gray
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                for (i in 5 downTo 1) {
+                    val count = ratingCounts[i] ?: 0
+                    val progress = if (totalReviews > 0) count.toFloat() / totalReviews else 0f
+                    ProviderRatingBar(label = "$i", progress = progress)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProviderRatingBar(label: String, progress: Float) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 2.dp)
+    ) {
+        Text(
+            text = label, 
+            fontSize = 12.sp, 
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(12.dp),
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .weight(1f)
+                .height(6.dp)
+                .clip(CircleShape),
+            color = MadadwalaColors.Green,
+            trackColor = MadadwalaColors.LightGray.copy(alpha = 0.5f)
+        )
+    }
+}
+
+@Composable
+fun ProviderReviewCard(review: ReviewResponse) {
+    val formattedDate = remember(review.createdAt) {
+        try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+            sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val date = sdf.parse(review.createdAt)
+            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(date!!)
+        } catch (e: Exception) {
+            review.createdAt.split("T").firstOrNull() ?: ""
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MadadwalaColors.LightGray.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val avatarColor = remember(review.customerName) {
+                    val colors = listOf(
+                        Color(0xFF4CAF50), Color(0xFF2196F3), Color(0xFF9C27B0),
+                        Color(0xFFFF9800), Color(0xFFE91E63), Color(0xFF00BCD4)
+                    )
+                    colors[review.customerName.length % colors.size]
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(avatarColor.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = review.customerName.take(1).uppercase(),
+                        color = avatarColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = review.customerName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MadadwalaColors.Ink)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        repeat(5) { index ->
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = if (index < review.rating) MadadwalaColors.Amber else MadadwalaColors.LightGray,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = formattedDate,
+                            fontSize = 12.sp,
+                            color = MadadwalaColors.Gray
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = review.comment,
+                fontSize = 14.sp,
+                color = MadadwalaColors.Ink.copy(alpha = 0.8f),
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun WithdrawalHistorySubScreen(uid: String, onBack: () -> Unit) {
+    var history by remember { mutableStateOf<List<WithdrawalResponse>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(uid) {
+        try {
+            val res = RetrofitClient.apiService.getWithdrawalHistory(uid)
+            if (res.isSuccessful) history = res.body() ?: emptyList()
+        } catch (e: Exception) {} finally { isLoading = false }
+    }
+
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MadadwalaColors.Ink) }
+            Text("Withdrawal History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink)
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        if (isLoading) {
+            Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = MadadwalaColors.Teal) }
+        } else if (history.isEmpty()) {
+            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                Text("No payout history yet.", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(history) { req ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MadadwalaColors.LightGray.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("Amount", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    Text("₹${req.amount}", fontWeight = FontWeight.Black, fontSize = 20.sp, color = MadadwalaColors.Ink)
+                                }
+                                
+                                val statusColor = when(req.status.lowercase()) {
+                                    "pending" -> MadadwalaColors.Amber
+                                    "paid", "approved" -> MadadwalaColors.Green
+                                    "rejected", "failed" -> MadadwalaColors.Red
+                                    else -> Color.Gray
+                                }
+                                
+                                Surface(
+                                    color = statusColor.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = req.status.uppercase(),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        color = statusColor,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AccountBalance, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("A/C: ${req.accountNumber}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                                Icon(Icons.Default.Event, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = req.createdAt.take(10), 
+                                    style = MaterialTheme.typography.bodySmall, 
+                                    color = Color.Gray
+                                )
+                            }
+
+                            if (!req.rejectionReason.isNullOrEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Rejection Reason: ${req.rejectionReason}",
+                                    color = MadadwalaColors.Red,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

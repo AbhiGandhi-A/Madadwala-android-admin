@@ -18,11 +18,12 @@ import androidx.navigation.compose.rememberNavController
 import com.abhi.madadwala_1.ui.navigation.NavGraph
 import com.abhi.madadwala_1.ui.theme.MadadwalaTheme
 import com.abhi.madadwala_1.ui.viewmodel.PaymentViewModel
-import com.razorpay.PaymentResultListener
+import com.razorpay.PaymentResultWithDataListener
+import com.razorpay.PaymentData
 import kotlinx.coroutines.launch
 import android.content.Intent
 
-class MainActivity : ComponentActivity(), PaymentResultListener {
+class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     private lateinit var paymentViewModel: PaymentViewModel
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -117,13 +118,17 @@ class MainActivity : ComponentActivity(), PaymentResultListener {
         }
     }
 
-    override fun onPaymentSuccess(razorpayPaymentId: String?) {
+    override fun onPaymentSuccess(razorpayPaymentId: String?, data: PaymentData?) {
         lifecycleScope.launch {
-            paymentViewModel.onPaymentSuccess(razorpayPaymentId)
+            paymentViewModel.onPaymentSuccess(
+                razorpayPaymentId,
+                data?.orderId,
+                data?.signature
+            )
         }
     }
 
-    override fun onPaymentError(code: Int, response: String?) {
+    override fun onPaymentError(code: Int, response: String?, data: PaymentData?) {
         lifecycleScope.launch {
             paymentViewModel.onPaymentError(code, response)
         }

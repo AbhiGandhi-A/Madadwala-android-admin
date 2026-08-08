@@ -38,6 +38,7 @@ class SignupViewModel : ViewModel() {
         category: String? = null,
         profession: String? = null,
         aadhaarNumber: String? = null,
+        referralCode: String? = null,
         profileImageUri: Uri?,
         aadhaarImageUri: Uri?
     ) {
@@ -52,13 +53,14 @@ class SignupViewModel : ViewModel() {
                 val categoryBody = category?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val professionBody = profession?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val aadhaarNoBody = aadhaarNumber?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val referralBody = referralCode?.toRequestBody("text/plain".toMediaTypeOrNull())
 
                 val profilePart = profileImageUri?.let { uriToMultipart(context, it, "profileImage") }
                 val aadhaarPart = aadhaarImageUri?.let { uriToMultipart(context, it, "aadhaarImage") }
 
                 val response = apiService.registerUser(
                     uidBody, phoneBody, roleBody, nameBody, emailBody, categoryBody, 
-                    professionBody, aadhaarNoBody, profilePart, aadhaarPart
+                    professionBody, aadhaarNoBody, referralBody, profilePart, aadhaarPart
                 )
 
                 if (response.isSuccessful) {

@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,15 +74,23 @@ fun ProviderActiveJobScreen(
     var otpValue by remember { mutableStateOf("") }
     var booking by remember { mutableStateOf<BookingResponse?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var showChatSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     
     // Socket Initialization
-    LaunchedEffect(Unit) {
-        SocketHandler.setSocket("https://madadwala-socket.onrender.com") // Placeholder
+    LaunchedEffect(bookingId) {
+        SocketHandler.setSocket("https://madadwala-backend.onrender.com")
         SocketHandler.establishConnection()
         val socket = SocketHandler.getSocket()
-        socket?.emit("join_booking", bookingId)
+        
+        socket?.on(io.socket.client.Socket.EVENT_CONNECT) {
+            socket.emit("join_booking", bookingId)
+        }
+        
+        if (socket?.connected() == true) {
+            socket.emit("join_booking", bookingId)
+        }
     }
 
     DisposableEffect(Unit) {
@@ -259,10 +268,10 @@ fun ProviderActiveJobScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Active Job", fontWeight = FontWeight.Bold) },
+                title = { Text("Active Job", fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { 
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") 
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MadadwalaColors.Ink)
                     }
                 },
                 actions = {
@@ -429,6 +438,22 @@ fun ProviderActiveJobScreen(
                                     Text("Call", color = MadadwalaColors.Ink, fontWeight = FontWeight.Bold)
                                 }
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Button(
+                                onClick = { showChatSheet = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF9FAFB)),
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Chat, contentDescription = null, tint = MadadwalaColors.Green, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Chat", color = MadadwalaColors.Ink, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -473,6 +498,37 @@ fun ProviderActiveJobScreen(
                                     Icon(Icons.Default.Navigation, contentDescription = null, tint = MadadwalaColors.Green, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("Navigate", color = MadadwalaColors.Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        
+                        // Issue Images Section
+                        if (!booking?.issueImages.isNullOrEmpty()) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            HorizontalDivider(color = Color(0xFFF3F4F6))
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            Text(
+                                "Issue Photos",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MadadwalaColors.Ink
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(booking!!.issueImages!!) { imageUrl ->
+                                    AsyncImage(
+                                        model = imageUrl,
+                                        contentDescription = "Issue Image",
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .border(1.dp, Color.LightGray.copy(0.3f), RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
                                 }
                             }
                         }
@@ -658,6 +714,13 @@ fun ProviderActiveJobScreen(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    if (showChatSheet) {
+        com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
+            bookingId = bookingId,
+            onDismiss = { showChatSheet = false }
+        )
     }
 }
 

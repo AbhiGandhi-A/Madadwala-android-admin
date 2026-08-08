@@ -172,7 +172,7 @@ fun NavGraph(navController: NavHostController) {
                         }
                     }
                 } else if (user != null) {
-                    if (user.role == "provider" && !user.isVerified) {
+                    if (user.role == "provider" && !user.isVerified && !user.kycRejected) {
                         if (currentRoute != Screen.VerificationPending.route) {
                             navController.navigate(Screen.VerificationPending.route) {
                                 popUpTo(0) { inclusive = true }

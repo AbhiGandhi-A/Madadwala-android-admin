@@ -23,6 +23,7 @@ interface ApiService {
         @Part("category") category: RequestBody? = null,
         @Part("profession") profession: RequestBody? = null,
         @Part("aadhaarNumber") aadhaarNumber: RequestBody? = null,
+        @Part("referralCode") referralCode: RequestBody? = null,
         @Part profileImage: MultipartBody.Part?,
         @Part aadhaarImage: MultipartBody.Part?
     ): Response<UserResponse>
@@ -36,8 +37,21 @@ interface ApiService {
     @GET("api/providers/{uid}")
     suspend fun getProviderDetails(@Path("uid") uid: String): Response<ProviderDetailResponse>
 
+    @Multipart
     @POST("api/bookings")
-    suspend fun createBooking(@Body booking: BookingRequest): Response<BookingResponse>
+    suspend fun createBooking(
+        @Part("customerUid") customerUid: RequestBody,
+        @Part("customerName") customerName: RequestBody,
+        @Part("providerUid") providerUid: RequestBody,
+        @Part("providerName") providerName: RequestBody?,
+        @Part("serviceName") serviceName: RequestBody,
+        @Part("address") address: RequestBody,
+        @Part("scheduledTime") scheduledTime: RequestBody,
+        @Part("totalAmount") totalAmount: RequestBody,
+        @Part("customerLat") customerLat: RequestBody?,
+        @Part("customerLng") customerLng: RequestBody?,
+        @Part issueImages: List<MultipartBody.Part>?
+    ): Response<BookingResponse>
 
     @GET("api/bookings/customer/{uid}")
     suspend fun getCustomerBookings(@Path("uid") uid: String): Response<List<BookingResponse>>
@@ -54,6 +68,18 @@ interface ApiService {
         @Body status: Map<String, String>
     ): Response<MessageResponse>
 
+    @PATCH("api/bookings/{id}/cancel")
+    suspend fun cancelBooking(
+        @Path("id") id: String,
+        @Body request: Map<String, String>
+    ): Response<MessageResponse>
+
+    @PATCH("api/bookings/{id}/reschedule")
+    suspend fun rescheduleBooking(
+        @Path("id") id: String,
+        @Body request: Map<String, String>
+    ): Response<MessageResponse>
+
     @POST("api/bookings/{id}/verify-otp")
     suspend fun verifyBookingOtp(
         @Path("id") id: String,
@@ -62,7 +88,14 @@ interface ApiService {
 
     @POST("api/bookings/{id}/complete-payment")
     suspend fun completePayment(
-        @Path("id") id: String
+        @Path("id") id: String,
+        @Body request: Map<String, String> = emptyMap()
+    ): Response<MessageResponse>
+
+    @POST("api/bookings/{id}/pay-from-wallet")
+    suspend fun payFromWallet(
+        @Path("id") id: String,
+        @Body request: Map<String, String>
     ): Response<MessageResponse>
 
     @POST("api/call/start")
@@ -75,11 +108,22 @@ interface ApiService {
         @Body request: Map<String, @JvmSuppressWildcards Any>
     ): Response<RazorpayOrderResponse>
 
+    @POST("api/payments/verify-wallet")
+    suspend fun verifyWalletPayment(
+        @Body request: Map<String, @JvmSuppressWildcards Any>
+    ): Response<MessageResponse>
+
     @PATCH("api/bookings/{id}/location")
     suspend fun updateBookingLocation(
         @Path("id") id: String,
         @Body location: Map<String, @JvmSuppressWildcards Any>
     ): Response<MessageResponse>
+
+    @GET("api/bookings/{id}/messages")
+    suspend fun getBookingMessages(@Path("id") id: String): Response<List<BookingMessageResponse>>
+
+    @POST("api/bookings/messages")
+    suspend fun sendBookingMessage(@Body request: BookingMessageRequest): Response<BookingMessageResponse>
 
     @GET("api/wallet/transactions/{uid}")
     suspend fun getWalletTransactions(@Path("uid") uid: String): Response<List<TransactionResponse>>
@@ -152,6 +196,9 @@ interface ApiService {
     @GET("api/offers")
     suspend fun getOffers(): Response<List<OfferResponse>>
 
+    @POST("api/offers/validate")
+    suspend fun validateCoupon(@Body request: Map<String, @JvmSuppressWildcards Any>): Response<CouponValidationResponse>
+
     @POST("api/admin/offers")
     suspend fun createOffer(@Body offer: OfferRequest): Response<OfferResponse>
 
@@ -191,6 +238,17 @@ interface ApiService {
     @POST("api/admin/approve-provider")
     suspend fun approveProvider(@Body request: ApproveProviderRequest): Response<MessageResponse>
 
+    @POST("api/admin/reject-provider")
+    suspend fun rejectProvider(@Body request: Map<String, String>): Response<MessageResponse>
+
+    @Multipart
+    @PATCH("api/users/{uid}/kyc")
+    suspend fun updateKyc(
+        @Path("uid") uid: String,
+        @Part("aadhaarNumber") aadhaarNumber: RequestBody,
+        @Part aadhaarImage: MultipartBody.Part?
+    ): Response<MessageResponse>
+
     @POST("api/admin/categories")
     suspend fun createCategory(@Body request: Map<String, String>): Response<CategoryResponse>
 
@@ -214,6 +272,9 @@ interface ApiService {
 
     @POST("api/withdrawals/request")
     suspend fun requestWithdrawal(@Body request: Map<String, @JvmSuppressWildcards Any>): Response<MessageResponse>
+
+    @GET("api/withdrawals/history/{uid}")
+    suspend fun getWithdrawalHistory(@Path("uid") uid: String): Response<List<WithdrawalResponse>>
 
     @GET("api/admin/analytics")
     suspend fun getAdminAnalytics(): Response<AdminAnalyticsResponse>
@@ -301,6 +362,20 @@ data class RazorpayOrderResponse(
     val currency: String,
     val amount: Long,
     val keyId: String
+)
+
+data class BookingMessageRequest(
+    val bookingId: String,
+    val senderUid: String,
+    val message: String
+)
+
+data class BookingMessageResponse(
+    val _id: String,
+    val bookingId: String,
+    val senderUid: String,
+    val message: String,
+    val timestamp: String
 )
 
 data class BidRequest(
@@ -467,6 +542,7 @@ data class BookingResponse(
     val partnerComment: String? = null,
     val customerPhone: String? = null,
     val providerImage: String? = null,
+    val issueImages: List<String>? = null,
     val createdAt: String
 )
 
@@ -509,6 +585,8 @@ data class UserResponse(
     val category: String?,
     val walletBalance: Double,
     val isVerified: Boolean,
+    val kycRejected: Boolean = false,
+    val kycRejectionReason: String? = null,
     val rating: Float? = null,
     val reviewCount: Int? = null,
     val totalJobs: Int? = null,
@@ -553,6 +631,14 @@ data class OfferResponse(
     val discount: Int,
     val expiryDate: String,
     val createdAt: String
+)
+
+data class CouponValidationResponse(
+    val valid: Boolean,
+    val discount: Int?,
+    val discountAmount: Double?,
+    val finalAmount: Double?,
+    val message: String
 )
 
 data class BannerResponse(

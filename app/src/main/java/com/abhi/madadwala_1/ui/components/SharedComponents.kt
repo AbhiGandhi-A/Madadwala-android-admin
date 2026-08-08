@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
@@ -76,25 +78,30 @@ fun PrimaryButton(
                 strokeWidth = 2.dp
             )
         } else {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 if (leadingIcon != null) {
-                    Box(modifier = Modifier.align(Alignment.CenterStart)) {
-                        leadingIcon()
-                    }
+                    leadingIcon()
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
                 
                 Text(
                     text = text,
                     style = MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 20.sp,
+                        fontSize = if (text.length > 18) 16.sp else 18.sp,
                         fontWeight = FontWeight.Bold
-                    )
+                    ),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 if (trailingIcon != null) {
-                    Box(modifier = Modifier.align(Alignment.CenterEnd)) {
-                        trailingIcon()
-                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    trailingIcon()
                 }
             }
         }
@@ -175,6 +182,8 @@ fun FormTextField(
             trailingIcon = trailingIcon,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MadadwalaColors.Ink,
+                unfocusedTextColor = MadadwalaColors.Ink,
                 focusedBorderColor = MadadwalaColors.Teal,
                 unfocusedBorderColor = MadadwalaColors.LightGray,
                 errorBorderColor = MadadwalaColors.Red,

@@ -135,6 +135,7 @@ fun HomeScreen(
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var showLocationPicker by remember { mutableStateOf(false) }
+    var activeChatBookingId by remember { mutableStateOf<String?>(null) }
 
     // Hoisted Home Tab Data
     var categories by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.CategoryResponse>>(emptyList()) }
@@ -159,7 +160,7 @@ fun HomeScreen(
     var acceptanceData by remember { mutableStateOf<AcceptanceData?>(null) }
     var prevPendingIds by remember { mutableStateOf(setOf<String>()) }
     var processedIds by remember { mutableStateOf(setOf<String>()) }
-    val sdf = remember { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") } }
+    val sdf = remember { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") } }
 
     LaunchedEffect(uid) {
         if (uid.isNotBlank()) {
@@ -176,7 +177,7 @@ fun HomeScreen(
                                 req.status == "pending" && 
                                 !processedIds.contains(req._id) &&
                                 createdTime >= (sessionStartTime - 30000L) // 30s buffer
-                            } catch (e: Exception) { false }
+                            } catch (_: Exception) { false }
                         }
                         myRequests = currentPending
                         val currentPendingIds = currentPending.map { it._id }.toSet()
@@ -188,7 +189,7 @@ fun HomeScreen(
                                 req.status == "accepted" && 
                                 !processedIds.contains(req._id) && 
                                 createdTime >= (sessionStartTime - 30000L)
-                            } catch (e: Exception) { false }
+                            } catch (_: Exception) { false }
                         }
 
                         if (recentlyAccepted != null) {
@@ -217,7 +218,7 @@ fun HomeScreen(
                                         try {
                                             val createdTime = sdf.parse(b.createdAt)?.time ?: 0L
                                             createdTime >= (sessionStartTime - 30000L) && !processedIds.contains(b._id)
-                                        } catch (e: Exception) { false }
+                                        } catch (_: Exception) { false }
                                     }
                                     if (newBooking != null) {
                                         var realProviderName = if (newBooking.providerName.isNullOrBlank()) {
@@ -243,7 +244,7 @@ fun HomeScreen(
                         }
                         prevPendingIds = currentPendingIds
                     }
-                } catch (e: Exception) {}
+                } catch (_: Exception) {}
                 kotlinx.coroutines.delay(5000)
             }
         }
@@ -274,7 +275,7 @@ fun HomeScreen(
                 if (providerResponse.isSuccessful) {
                     nearbyProviders = providerResponse.body() ?: emptyList()
                 }
-            } catch (e: Exception) {} finally {
+            } catch (_: Exception) {} finally {
                 isProvidersLoading = false
             }
             delay(10000) // Refresh every 10 seconds
@@ -390,7 +391,13 @@ fun HomeScreen(
                                 authViewModel.refresh()
                             }
                         },
-                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        label = { 
+                            Text(
+                                text = label, 
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) MadadwalaColors.Green else MadadwalaColors.Gray
+                            ) 
+                        },
                         icon = {
                             if (isSelected) {
                                 Box(
@@ -441,7 +448,8 @@ fun HomeScreen(
                         onTabSelect = { selectedTab = it },
                         walletBalance = user?.walletBalance ?: 0.0,
                         callViewModel = callViewModel,
-                        isProvidersLoading = isProvidersLoading
+                        isProvidersLoading = isProvidersLoading,
+                        onChat = { activeChatBookingId = it }
                     )
                     4 -> CategoriesTabContent(
                         user = user,
@@ -461,7 +469,7 @@ fun HomeScreen(
                         callViewModel = callViewModel,
                         nearbyProviders = nearbyProviders
                     )
-                    1 -> BookingsTabContent(user?.uid ?: "", onNavigate, callViewModel)
+                    1 -> BookingsTabContent(user?.uid ?: "", onNavigate, callViewModel, onChat = { activeChatBookingId = it })
                     2 -> WalletTabContent(user, onNavigate)
                     3 -> ProfileTabContent(userName, user?.phoneNumber ?: "", user?.profileImage, onLogout, onNavigate)
                 }
@@ -566,7 +574,7 @@ fun HomeScreen(
                                                             mapOf("status" to "cancelled")
                                                         )
                                                         processedIds = processedIds + currentRequest._id
-                                                    } catch (e: Exception) {}
+                                                    } catch (_: Exception) {}
                                                 }
                                             }
                                         )
@@ -649,6 +657,13 @@ fun HomeScreen(
             }
         }
     }
+
+    activeChatBookingId?.let { bookingId ->
+        com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
+            bookingId = bookingId,
+            onDismiss = { activeChatBookingId = null }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -666,7 +681,8 @@ fun HomeTabContent(
     onTabSelect: (Int) -> Unit = {},
     walletBalance: Double = 0.0,
     callViewModel: CallViewModel,
-    isProvidersLoading: Boolean = false
+    isProvidersLoading: Boolean = false,
+    onChat: (String) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var sortOrder by remember { mutableStateOf("Default") }
@@ -769,7 +785,7 @@ fun HomeTabContent(
             ) {
                 QuickActionItem("Instant Help", "Quick", Icons.Default.FlashOn, MadadwalaColors.Green) { onTabSelect(4) }
                 QuickActionItem("Bookings", "My Bookings", Icons.Default.CalendarToday, MadadwalaColors.Green) { onTabSelect(1) }
-                QuickActionItem("Wallet", "₹${String.format("%.0f", walletBalance)}", Icons.Default.AccountBalanceWallet, MadadwalaColors.Green) { onTabSelect(2) }
+                QuickActionItem("Wallet", "₹${String.format(Locale.getDefault(), "%.0f", walletBalance)}", Icons.Default.AccountBalanceWallet, MadadwalaColors.Green) { onTabSelect(2) }
                 QuickActionItem("Offers", "Save More", Icons.Default.LocalOffer, MadadwalaColors.Green) { onNavigate(Screen.Offers.route) }
                 QuickActionItem("Support", "Help Center", Icons.Default.HeadsetMic, MadadwalaColors.Green) { onNavigate(Screen.HelpSupport.route) }
             }
@@ -835,7 +851,7 @@ fun HomeTabContent(
             val activeBooking = recentBookings.find { it.status == "accepted" || it.status == "on_the_way" || it.status == "arrived" }
             if (activeBooking != null) {
                 val provider = nearbyProviders.find { it.uid == activeBooking.providerUid }
-                LiveTrackingCard(activeBooking, provider, onNavigate, callViewModel)
+                LiveTrackingCard(activeBooking, provider, onNavigate, onChat, callViewModel)
             }
 
             // Nearby Available Partners
@@ -1050,6 +1066,8 @@ fun HomeTabContent(
             }
         }
     }
+
+
 }
 
 @Composable
@@ -1094,13 +1112,14 @@ fun LiveTrackingCard(
     booking: com.abhi.madadwala_1.data.remote.BookingResponse,
     provider: com.abhi.madadwala_1.data.remote.ProviderResponse?,
     onNavigate: (String) -> Unit,
+    onChat: (String) -> Unit,
     callViewModel: CallViewModel
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     // Real-time duration calculation
-    var durationText by remember { mutableStateOf("Calculating...") }
+    var durationText by remember { mutableStateOf("Not Started") }
 
     LaunchedEffect(booking.providerLat, booking.providerLng, booking.customerLat, booking.customerLng) {
         if (booking.customerLat != null && booking.customerLng != null &&
@@ -1115,11 +1134,11 @@ fun LiveTrackingCard(
                         destination = dest,
                         apiKey = "AIzaSyCmBUpQgoSWPSXcC0DpxilJzJGTXJtke-8"
                     )
-                } catch (e: Exception) { null }
+                } catch (_: Exception) { null }
 
                 if (response != null && response.isSuccessful && response.body()?.status == "OK") {
                     val route = response.body()?.routes?.firstOrNull()
-                    durationText = route?.legs?.firstOrNull()?.duration?.text?.replace(" mins", " min") ?: "..."
+                    durationText = route?.legs?.firstOrNull()?.duration?.text?.replace(" mins", " min") ?: "Not Started"
                 } else {
                     val results = FloatArray(1)
                     android.location.Location.distanceBetween(
@@ -1131,8 +1150,8 @@ fun LiveTrackingCard(
                     val minutes = (distanceInMeters / 400).toInt().coerceAtLeast(1)
                     durationText = "$minutes min"
                 }
-            } catch (e: Exception) {
-                durationText = "..."
+            } catch (_: Exception) {
+                durationText = "Not Started"
             }
         }
     }
@@ -1216,7 +1235,7 @@ fun LiveTrackingCard(
                     Column(modifier = Modifier.padding(horizontal = 8.dp), horizontalAlignment = Alignment.Start) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = if (booking.status == "arrived") Icons.Default.CheckCircle else Icons.Default.DirectionsRun,
+                                imageVector = if (booking.status == "arrived") Icons.Default.CheckCircle else Icons.AutoMirrored.Filled.DirectionsRun,
                                 contentDescription = null,
                                 tint = MadadwalaColors.Green,
                                 modifier = Modifier.size(16.dp)
@@ -1234,7 +1253,11 @@ fun LiveTrackingCard(
                             )
                         }
                         Text(
-                            text = if (booking.status == "arrived") "Partner is here" else "Arriving in",
+                            text = when {
+                                booking.status == "arrived" -> "Partner is here"
+                                durationText == "Not Started" -> "Partner"
+                                else -> "Arriving in"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.Gray
                         )
@@ -1264,7 +1287,7 @@ fun LiveTrackingCard(
                                     .include(providerPos)
                                     .build()
                                 mapCameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, 40))
-                            } catch (e: Exception) {}
+                            } catch (_: Exception) {}
                         }
                     }
 
@@ -1294,13 +1317,13 @@ fun LiveTrackingCard(
                         ) {
                             if (booking.customerLat != null && booking.customerLng != null) {
                                 Marker(
-                                    state = MarkerState(position = customerPos),
+                                    state = remember(customerPos) { MarkerState(position = customerPos) },
                                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
                                 )
                             }
                             if (booking.providerLat != null && booking.providerLng != null) {
                                 Marker(
-                                    state = MarkerState(position = providerPos),
+                                    state = remember(providerPos) { MarkerState(position = providerPos) },
                                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)
                                 )
                                 Polyline(
@@ -1336,12 +1359,12 @@ fun LiveTrackingCard(
                         Text("Call", style = MaterialTheme.typography.labelMedium)
                     }
                     OutlinedButton(
-                        onClick = { /* Chat */ },
+                        onClick = { onChat(booking._id) },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
-                        Icon(Icons.Default.Chat, null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.Chat, null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Chat", style = MaterialTheme.typography.labelMedium)
                     }
@@ -1359,6 +1382,8 @@ fun LiveTrackingCard(
             }
         }
     }
+
+
 }
 
 @Composable
@@ -1399,6 +1424,8 @@ fun ServiceCardV2(name: String, icon: ImageVector, onClick: () -> Unit) {
             )
         }
     }
+
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1434,7 +1461,7 @@ fun CategoriesTabContent(
             if (response.isSuccessful && !response.body().isNullOrEmpty()) {
                 categories = response.body()!!
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
         } finally {
             isLoading = false
         }
@@ -1950,6 +1977,8 @@ fun CategoriesTabContent(
             }
         }
     }
+
+
 }
 
 @Composable
@@ -1971,6 +2000,8 @@ fun TrustItem(icon: ImageVector, title: String, subtitle: String) {
             }
         }
     }
+
+
 }
 
 @Composable
@@ -2013,7 +2044,7 @@ fun BidItem(
                                     onAccept(bookingId, bid.providerName)
                                 }
                             }
-                        } catch (e: Exception) {}
+                        } catch (_: Exception) {}
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Green),
@@ -2023,6 +2054,8 @@ fun BidItem(
             }
         }
     }
+
+
 }
 
 @SuppressLint("MissingPermission")
@@ -2246,7 +2279,7 @@ fun CustomRequestDialog(
                                             }
                                         }
                                     }
-                                } catch (e: Exception) {}
+                                } catch (_: Exception) {}
                             }
                         },
                         modifier = Modifier.weight(1.5f).height(50.dp),
@@ -2260,6 +2293,8 @@ fun CustomRequestDialog(
             }
         }
     }
+
+
 }
 
 @Composable
@@ -2397,6 +2432,8 @@ fun PromoBannerCarousel(banners: List<com.abhi.madadwala_1.data.remote.BannerRes
             }
         }
     }
+
+
 }
 
 @Composable
@@ -2450,7 +2487,7 @@ fun getIconForCategory(iconName: String?): ImageVector {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BookingsTabContent(uid: String, onNavigate: (String) -> Unit, callViewModel: CallViewModel) {
+fun BookingsTabContent(uid: String, onNavigate: (String) -> Unit, callViewModel: CallViewModel, onChat: (String) -> Unit) {
     var bookings by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.BookingResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedFilter by remember { mutableStateOf("All Bookings") }
@@ -2467,7 +2504,7 @@ fun BookingsTabContent(uid: String, onNavigate: (String) -> Unit, callViewModel:
                 if (response.isSuccessful) {
                     bookings = response.body() ?: emptyList()
                 }
-            } catch (e: Exception) {}
+            } catch (_: Exception) {}
             finally { isLoading = false }
         }
     }
@@ -2564,12 +2601,20 @@ fun BookingsTabContent(uid: String, onNavigate: (String) -> Unit, callViewModel:
                         onRebook = {
                             onNavigate(Screen.BookingFlow.createRoute(booking.providerUid, booking.serviceName, booking.totalAmount))
                         },
+                        onPay = {
+                            onNavigate(Screen.Payment.createRoute(booking._id))
+                        },
+                        onChat = {
+                            onChat(booking._id)
+                        },
                         callViewModel = callViewModel
                     )
                 }
             }
         }
     }
+
+
 }
 
 @Composable
@@ -2578,29 +2623,34 @@ fun BookingCardV2(
     onViewDetails: () -> Unit,
     onTrackPartner: () -> Unit,
     onRebook: () -> Unit,
+    onPay: () -> Unit,
+    onChat: () -> Unit,
     callViewModel: CallViewModel
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val statusColor = when (booking.status) {
-        "done" -> Color(0xFFE3F2FD) // Light blue background for DONE
-        "cancelled" -> Color(0xFFFFEBEE)
-        "pending", "accepted", "on_the_way", "arrived" -> Color(0xFFE8F5E9)
+    val isUnpaidDone = booking.status == "done" && booking.paymentStatus != "paid"
+
+    val statusColor = when {
+        isUnpaidDone -> Color(0xFFFFEBEE) // Light red for PAY NOW
+        booking.status == "done" -> Color(0xFFE3F2FD) // Light blue background for DONE
+        booking.status == "cancelled" -> Color(0xFFFFEBEE)
         else -> Color(0xFFE8F5E9)
     }
     
-    val statusTextColor = when (booking.status) {
-        "done" -> Color(0xFF2196F3)
-        "cancelled" -> Color(0xFFF44336)
-        "accepted" -> Color(0xFF4CAF50)
-        "arrived" -> Color(0xFFFF9800)
+    val statusTextColor = when {
+        isUnpaidDone -> Color(0xFFF44336) // Red for PAY NOW
+        booking.status == "done" -> Color(0xFF2196F3)
+        booking.status == "cancelled" -> Color(0xFFF44336)
+        booking.status == "accepted" -> Color(0xFF4CAF50)
+        booking.status == "arrived" -> Color(0xFFFF9800)
         else -> Color(0xFF4CAF50)
     }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick { onViewDetails() },
+            .bounceClick { if (isUnpaidDone) onPay() else onViewDetails() },
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         shadowElevation = 2.dp
@@ -2695,10 +2745,13 @@ fun BookingCardV2(
                 Column(horizontalAlignment = Alignment.End) {
                     Surface(
                         color = statusColor,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.then(
+                            if (isUnpaidDone) Modifier.clickable { onPay() } else Modifier
+                        )
                     ) {
                         Text(
-                            text = booking.status.replace("_", " ").uppercase(),
+                            text = if (isUnpaidDone) "PAY NOW" else booking.status.replace("_", " ").uppercase(),
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = statusTextColor,
@@ -2745,13 +2798,19 @@ fun BookingCardV2(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (booking.status == "done") {
+                    if (booking.paymentStatus != "paid") {
+                        BookingActionItem(Icons.Default.Payments, "Pay Now") { onPay() }
+                        VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
+                    }
                     BookingActionItem(Icons.Default.History, "Rebook") { onRebook() }
-                    VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
-                    BookingActionItem(Icons.Default.StarBorder, "Rate & Review") { /* Rate */ }
-                    VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
-                    BookingActionItem(Icons.Default.FileDownload, "Invoice") {
-                        scope.launch {
-                            InvoiceGenerator.generateInvoice(context, booking)
+                    if (booking.paymentStatus == "paid") {
+                        VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
+                        BookingActionItem(Icons.Default.StarBorder, "Rate & Review") { /* Rate */ }
+                        VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
+                        BookingActionItem(Icons.Default.FileDownload, "Invoice") {
+                            scope.launch {
+                                InvoiceGenerator.generateInvoice(context, booking)
+                            }
                         }
                     }
                 } else {
@@ -2766,7 +2825,7 @@ fun BookingCardV2(
                         )
                     }
                     VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
-                    BookingActionItem(Icons.Default.Chat, "Chat") { /* Chat */ }
+                    BookingActionItem(Icons.AutoMirrored.Filled.Chat, "Chat") { onChat() }
                 }
                 VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
                 Row(
@@ -2779,6 +2838,8 @@ fun BookingCardV2(
             }
         }
     }
+
+
 }
 
 @Composable
@@ -2810,6 +2871,8 @@ fun BookingFilterChip(label: String, icon: ImageVector, isSelected: Boolean, onC
             )
         }
     }
+
+
 }
 
 @Composable
@@ -2918,7 +2981,12 @@ fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNav
                                 balance = state.balance,
                                 walletId = state.walletId,
                                 isVisible = isBalanceVisible,
-                                onToggleVisibility = { isBalanceVisible = !isBalanceVisible },
+                                onToggleVisibility = { 
+                                    isBalanceVisible = !isBalanceVisible
+                                    if (isBalanceVisible) {
+                                        viewModel.fetchWalletData()
+                                    }
+                                },
                                 onAddMoney = { onNavigate(Screen.AddMoney.route) },
                                 onTransactions = { onNavigate(Screen.TransactionHistory.route) }
                             )
@@ -2952,7 +3020,7 @@ fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNav
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text("View All", color = Color(0xFF4CAF50))
                                         Icon(
-                                            Icons.Default.KeyboardArrowRight,
+                                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                             contentDescription = null,
                                             tint = Color(0xFF4CAF50)
                                         )
@@ -2985,6 +3053,8 @@ fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNav
             }
         }
     }
+
+
 }
 
 @Composable
@@ -2997,6 +3067,7 @@ fun ProfileTabContent(
 ) {
     var showEditProfile by remember { mutableStateOf(false) }
     var showSavedAddresses by remember { mutableStateOf(false) }
+    var legalContentType by remember { mutableStateOf<String?>(null) }
     var currentName by remember { mutableStateOf(name) }
     var offersCount by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -3016,7 +3087,7 @@ fun ProfileTabContent(
             if (res.isSuccessful) {
                 offersCount = res.body()?.size ?: 0
             }
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
     }
 
     LazyColumn(
@@ -3069,7 +3140,7 @@ fun ProfileTabContent(
                     var showHelpMenu by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { showHelpMenu = true }) {
-                            Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = MadadwalaColors.Green)
+                            Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = "Help", tint = MadadwalaColors.Green)
                         }
                         DropdownMenu(
                             expanded = showHelpMenu,
@@ -3130,22 +3201,6 @@ fun ProfileTabContent(
                                             style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Black)
                                         )
                                     }
-                                }
-                                Surface(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .offset(x = 2.dp, y = 2.dp),
-                                    shape = CircleShape,
-                                    color = Color.White,
-                                    border = BorderStroke(1.dp, MadadwalaColors.LightGray),
-                                    shadowElevation = 2.dp
-                                ) {
-                                    Icon(
-                                        Icons.Default.CameraAlt,
-                                        contentDescription = "Edit photo",
-                                        modifier = Modifier.padding(6.dp).size(16.dp),
-                                        tint = MadadwalaColors.Green
-                                    )
                                 }
                             }
                         }
@@ -3284,7 +3339,9 @@ fun ProfileTabContent(
         item {
             ProfileSection("Support & Info") {
                 ProfileOptionItem("Help & Support", "Get help and contact support", Icons.Default.SupportAgent) { onNavigate(Screen.HelpSupport.route) }
-                ProfileOptionItem("About Madadwala", "App info, terms and policies", Icons.Default.Info) {}
+                ProfileOptionItem("About Madadwala", "App info, terms and policies", Icons.Default.Info) { legalContentType = "About" }
+                ProfileOptionItem("Terms & Conditions", "Usage terms and legal rules", Icons.Default.Description) { legalContentType = "Terms" }
+                ProfileOptionItem("Privacy Policy", "How we handle your data", Icons.Default.PrivacyTip) { legalContentType = "Privacy" }
             }
         }
 
@@ -3372,6 +3429,82 @@ fun ProfileTabContent(
     if (showSavedAddresses) {
         SavedAddressesDialog(uid = user?.uid ?: "", onDismiss = { showSavedAddresses = false })
     }
+
+    if (legalContentType != null) {
+        LegalContentDialog(
+            type = legalContentType!!,
+            onDismiss = { legalContentType = null }
+        )
+    }
+}
+
+@Composable
+fun LegalContentDialog(type: String, onDismiss: () -> Unit) {
+    val title = when(type) {
+        "About" -> "About Madadwala"
+        "Terms" -> "Terms & Conditions"
+        "Privacy" -> "Privacy Policy"
+        else -> "Information"
+    }
+
+    val content = when(type) {
+        "About" -> """
+            Madadwala is your one-stop solution for all home service needs. We connect you with verified, background-checked professionals for services ranging from plumbing and electrical work to deep cleaning and beauty services.
+            
+            Our mission is to empower local service providers while ensuring homeowners receive top-quality, reliable, and safe services at fair prices.
+            
+            Version: 1.0.4 (Stable)
+            Developed by: Abhi Gandhi
+        """.trimIndent()
+        "Terms" -> """
+            1. Acceptance of Terms: By using Madadwala, you agree to comply with our service rules.
+            
+            2. User Responsibilities: Users must provide accurate location and contact information for service delivery.
+            
+            3. Payments: All payments must be made through our secure gateway or agreed cash-on-service methods.
+            
+            4. Cancellations: Cancellations are allowed up to 30 minutes before the scheduled time. Refunds are processed to the wallet.
+            
+            5. Prohibited Activities: Any harassment of service partners or misuse of the platform will result in an immediate permanent ban.
+        """.trimIndent()
+        "Privacy" -> """
+            1. Data Collection: We collect your phone number, name, and location to provide accurate services.
+            
+            2. Data Usage: Your location is shared with the assigned partner ONLY during an active booking.
+            
+            3. Security: We use industry-standard encryption to protect your payment and personal data.
+            
+            4. Third Parties: We do not sell your personal information to third-party advertisers.
+            
+            5. Controls: You can request account deletion and data removal at any time through our support channel.
+        """.trimIndent()
+        else -> ""
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = { Text(title, fontWeight = FontWeight.Bold, color = MadadwalaColors.Green) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MadadwalaColors.Ink,
+                    lineHeight = 22.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Green),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable
@@ -3396,6 +3529,8 @@ fun ProfileSection(title: String, content: @Composable () -> Unit) {
             }
         }
     }
+
+
 }
 
 @Composable
@@ -3476,7 +3611,7 @@ fun SavedAddressesDialog(uid: String, onDismiss: () -> Unit) {
         try {
             val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getAddresses(uid)
             if (res.isSuccessful) addresses = res.body() ?: emptyList()
-        } catch (e: Exception) {} finally { isLoading = false }
+        } catch (_: Exception) {} finally { isLoading = false }
     }
 
     if (showMapPicker) {
@@ -3578,7 +3713,7 @@ fun MapLocationPickerDialog(
                     if (!addresses.isNullOrEmpty()) {
                         addressText = addresses[0].getAddressLine(0) ?: "Unknown Location"
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     addressText = "Location pinpointed"
                 }
             }
@@ -3703,6 +3838,8 @@ fun MapLocationPickerDialog(
             }
         }
     }
+
+
 }
 
 data class ServiceItem(val name: String, val icon: ImageVector, val color: Color)
@@ -3750,7 +3887,7 @@ fun LocationPickerOverlay(
         try {
             val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getAddresses(uid)
             if (res.isSuccessful) addresses = res.body() ?: emptyList()
-        } catch (e: Exception) {} finally { isLoading = false }
+        } catch (_: Exception) {} finally { isLoading = false }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -3816,6 +3953,8 @@ fun LocationPickerOverlay(
             }
         }
     }
+
+
 }
 
 data class AcceptanceData(
@@ -3900,4 +4039,6 @@ fun BidTimer(expiryTimeMillis: Long, onExpire: () -> Unit = {}) {
             )
         }
     }
+
+
 }

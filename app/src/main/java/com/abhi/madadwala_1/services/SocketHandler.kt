@@ -6,11 +6,16 @@ import java.net.URISyntaxException
 
 object SocketHandler {
     private var mSocket: Socket? = null
+    private var currentUrl: String? = null
 
     @Synchronized
     fun setSocket(url: String) {
+        if (currentUrl == url && mSocket != null) return
+        
         try {
+            mSocket?.disconnect()
             mSocket = IO.socket(url)
+            currentUrl = url
         } catch (e: URISyntaxException) {
             e.printStackTrace()
         }

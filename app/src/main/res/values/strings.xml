@@ -51,4 +51,5 @@
     <string name="status_pending">PENDING</string>
     <string name="status_cancelled">CANCELLED</string>
     <string name="status_upcoming">UPCOMING</string>
+    <string name="my_reviews">My Reviews</string>
 </resources>

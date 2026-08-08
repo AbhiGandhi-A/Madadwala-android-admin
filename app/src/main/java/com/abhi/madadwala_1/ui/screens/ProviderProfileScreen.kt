@@ -107,10 +107,10 @@ fun ProviderProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Provider Profile", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+                title = { Text("Provider Profile", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MadadwalaColors.Ink) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MadadwalaColors.Ink)
                     }
                 },
                 actions = {
@@ -595,20 +595,40 @@ fun ReviewsSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Reviews & Ratings", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            TextButton(onClick = onToggleSeeAll) {
-                Text(text = if (showAll) "See Less" else "See All", color = MadadwalaColors.Green, fontWeight = FontWeight.Bold)
-                Icon(
-                    if (showAll) Icons.Default.KeyboardArrowUp else Icons.AutoMirrored.Filled.KeyboardArrowRight, 
-                    contentDescription = null, 
-                    tint = MadadwalaColors.Green
-                )
+            Text(text = "Reviews & Ratings", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MadadwalaColors.Ink)
+            if (reviews.size > 2) {
+                TextButton(onClick = onToggleSeeAll) {
+                    Text(text = if (showAll) "See Less" else "See All (${reviews.size})", color = MadadwalaColors.Green, fontWeight = FontWeight.Bold)
+                    Icon(
+                        if (showAll) Icons.Default.KeyboardArrowUp else Icons.AutoMirrored.Filled.KeyboardArrowRight, 
+                        contentDescription = null, 
+                        tint = MadadwalaColors.Green
+                    )
+                }
             }
         }
 
         if (reviews.isEmpty()) {
-            Text("No reviews yet", color = Color.Gray)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MadadwalaColors.Cream.copy(alpha = 0.5f)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(Icons.Default.Comment, contentDescription = null, tint = MadadwalaColors.Gray.copy(0.3f), modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("No reviews yet", color = MadadwalaColors.Gray, style = MaterialTheme.typography.bodyMedium)
+                    Text("Be the first to rate this professional", color = MadadwalaColors.Gray.copy(0.7f), style = MaterialTheme.typography.bodySmall)
+                }
+            }
         } else {
+            RatingSummary(reviews = reviews)
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
             val displayReviews = if (showAll) reviews else reviews.take(2)
             displayReviews.forEach { review ->
                 ReviewCard(review)
@@ -619,7 +639,99 @@ fun ReviewsSection(
 }
 
 @Composable
+fun RatingSummary(reviews: List<com.abhi.madadwala_1.data.remote.ReviewResponse>) {
+    val totalReviews = reviews.size
+    val averageRating = if (totalReviews > 0) reviews.map { it.rating }.average() else 0.0
+    val ratingCounts = reviews.groupingBy { it.rating }.eachCount()
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MadadwalaColors.Cream.copy(alpha = 0.3f),
+        border = BorderStroke(1.dp, Color(0xFFF0F0F0))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(end = 24.dp)
+            ) {
+                Text(
+                    text = String.format("%.1f", averageRating),
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.Black
+                )
+                Row {
+                    repeat(5) { index ->
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = if (index < averageRating.toInt()) Color(0xFFFFB400) else Color.LightGray,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Out of 5",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MadadwalaColors.Gray
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                for (i in 5 downTo 1) {
+                    val count = ratingCounts[i] ?: 0
+                    val progress = if (totalReviews > 0) count.toFloat() / totalReviews else 0f
+                    RatingBar(label = "$i", progress = progress)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RatingBar(label: String, progress: Float) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 1.dp)
+    ) {
+        Text(
+            text = label, 
+            fontSize = 11.sp, 
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(10.dp),
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .weight(1f)
+                .height(4.dp)
+                .clip(CircleShape),
+            color = MadadwalaColors.Green,
+            trackColor = Color.LightGray.copy(alpha = 0.2f)
+        )
+    }
+}
+
+@Composable
 fun ReviewCard(review: com.abhi.madadwala_1.data.remote.ReviewResponse) {
+    val formattedDate = remember(review.createdAt) {
+        try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+            sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val date = sdf.parse(review.createdAt)
+            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(date!!)
+        } catch (e: Exception) {
+            review.createdAt.split("T").firstOrNull() ?: ""
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -629,44 +741,67 @@ fun ReviewCard(review: com.abhi.madadwala_1.data.remote.ReviewResponse) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Avatar
+                val avatarColor = remember(review.customerName) {
+                    val colors = listOf(
+                        Color(0xFF4CAF50), Color(0xFF2196F3), Color(0xFF9C27B0),
+                        Color(0xFFFF9800), Color(0xFFE91E63), Color(0xFF00BCD4)
+                    )
+                    colors[review.customerName.length % colors.size]
+                }
+                
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(MadadwalaColors.Green),
+                        .background(avatarColor.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = review.customerName.take(1).uppercase(),
-                        color = Color.White,
+                        color = avatarColor,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = review.customerName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Row {
+                    Text(text = review.customerName, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         repeat(5) { index ->
                             Icon(
                                 imageVector = Icons.Default.Star,
                                 contentDescription = null,
                                 tint = if (index < review.rating) Color(0xFFFFB400) else Color.LightGray,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                         }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = formattedDate,
+                            fontSize = 11.sp,
+                            color = MadadwalaColors.Gray
+                        )
                     }
                 }
-                Text(
-                    text = review.createdAt.split("T").firstOrNull() ?: "",
-                    fontSize = 12.sp,
-                    color = MadadwalaColors.Gray
-                )
+                
+                Surface(
+                    color = Color(0xFFE8F5E9),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "Verified",
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                        fontSize = 9.sp,
+                        color = Color(0xFF4CAF50),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = review.comment,
                 fontSize = 14.sp,
-                color = Color.DarkGray
+                color = Color(0xFF424242),
+                lineHeight = 20.sp
             )
         }
     }

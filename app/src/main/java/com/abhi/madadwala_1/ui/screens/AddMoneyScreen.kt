@@ -2,6 +2,7 @@ package com.abhi.madadwala_1.ui.screens
 
 import android.app.Activity
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,7 +40,9 @@ import org.json.JSONObject
 @Composable
 fun AddMoneyScreen(
     onBack: () -> Unit,
-    paymentViewModel: PaymentViewModel = viewModel()
+    paymentViewModel: PaymentViewModel = viewModel(
+        viewModelStoreOwner = LocalContext.current as ComponentActivity
+    )
 ) {
     var amount by remember { mutableStateOf("") }
     var isPaying by remember { mutableStateOf(false) }
@@ -50,28 +53,46 @@ fun AddMoneyScreen(
     val quickAmounts = listOf("100", "200", "500", "1000", "2000", "5000")
 
     LaunchedEffect(Unit) {
-        Checkout.preload(context.applicationContext)
+        try {
+            Checkout.preload(context.applicationContext)
+        } catch (e: Exception) {
+            android.util.Log.e("AddMoneyScreen", "Razorpay preload failed", e)
+        }
     }
 
     LaunchedEffect(Unit) {
         paymentViewModel.paymentResult.collectLatest { result ->
+            if (!isPaying) return@collectLatest
+            
             when (result) {
                 is PaymentResult.Success -> {
-                    isPaying = true
                     try {
-                        // Here we notify the backend that wallet top-up is successful
-                        // Assuming the backend handles the payment.id and updates the wallet
-                        Toast.makeText(context, "Wallet Updated Successfully!", Toast.LENGTH_LONG).show()
-                        onBack()
+                        val response = RetrofitClient.apiService.verifyWalletPayment(
+                            mapOf(
+                                "razorpay_order_id" to (result.orderId ?: ""),
+                                "razorpay_payment_id" to (result.paymentId ?: ""),
+                                "razorpay_signature" to (result.signature ?: ""),
+                                "uid" to (auth.currentUser?.uid ?: ""),
+                                "amount" to amount
+                            )
+                        )
+
+                        if (response.isSuccessful) {
+                            Toast.makeText(context, "Wallet Updated Successfully!", Toast.LENGTH_LONG).show()
+                            onBack()
+                        } else {
+                            Toast.makeText(context, "Verification Failed: ${response.message()}", Toast.LENGTH_SHORT).show()
+                        }
                     } catch (e: Exception) {
-                        Toast.makeText(context, "Failed to update wallet", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                     } finally {
                         isPaying = false
                     }
                 }
                 is PaymentResult.Error -> {
                     isPaying = false
-                    Toast.makeText(context, "Payment Failed", Toast.LENGTH_SHORT).show()
+                    val errorMsg = if (result.code == 0) "Payment Cancelled" else (result.message ?: "Payment Failed")
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -89,11 +110,12 @@ fun AddMoneyScreen(
         scope.launch {
             isPaying = true
             try {
+                val amountDouble = amount.toDoubleOrNull() ?: 0.0
                 val response = RetrofitClient.apiService.createRazorpayOrder(
                     mapOf(
                         "amount" to amountDouble,
                         "type" to "wallet",
-                        "userUid" to (auth.currentUser?.uid ?: "")
+                        "uid" to (auth.currentUser?.uid ?: "")
                     )
                 )
 
@@ -103,18 +125,39 @@ fun AddMoneyScreen(
                     checkout.setKeyID(order.keyId)
 
                     val options = JSONObject()
-                    options.put("name", "Madadwala Wallet")
-                    options.put("description", "Top-up Wallet")
+                    options.put("name", "Madadwala")
+                    options.put("description", "Wallet Top-up")
+                    options.put("image", "https://s3.amazonaws.com/rzp-mobile/images/rzp.png")
                     options.put("theme.color", "#1E5631")
                     options.put("currency", order.currency)
                     options.put("amount", order.amount)
                     options.put("order_id", order.id)
                     
                     val prefill = JSONObject()
+                    prefill.put("name", auth.currentUser?.displayName ?: "Customer")
                     prefill.put("contact", auth.currentUser?.phoneNumber ?: "")
+                    prefill.put("email", auth.currentUser?.email ?: "support@madadwala.com")
                     options.put("prefill", prefill)
 
-                    checkout.open(activity, options)
+                    options.put("send_sms_hash", true)
+
+                    val retryObj = JSONObject()
+                    retryObj.put("enabled", true)
+                    retryObj.put("max_count", 4)
+                    options.put("retry", retryObj)
+
+
+                    try {
+                        checkout.open(activity, options)
+                    } catch (e: Exception) {
+                        val msg = e.message ?: ""
+                        if (msg.contains("webview", ignoreCase = true) || msg.contains("package", ignoreCase = true)) {
+                            Toast.makeText(context, "WebView Error: Please update 'Android System WebView' and 'Google Chrome' from Play Store.", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "Error opening payment: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                        isPaying = false
+                    }
                 } else {
                     Toast.makeText(context, "Failed to initiate payment", Toast.LENGTH_SHORT).show()
                     isPaying = false
@@ -166,6 +209,7 @@ fun AddMoneyScreen(
                 value = amount,
                 onValueChange = { if (it.length <= 6) amount = it },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isPaying,
                 placeholder = { Text("₹0.00") },
                 textStyle = LocalTextStyle.current.copy(
                     fontSize = 32.sp,
@@ -192,7 +236,7 @@ fun AddMoneyScreen(
                 items(quickAmounts) { qAmount ->
                     Surface(
                         modifier = Modifier
-                            .clickable { amount = qAmount }
+                            .clickable(enabled = !isPaying) { amount = qAmount }
                             .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         color = if (amount == qAmount) MadadwalaColors.Green else Color.Transparent,

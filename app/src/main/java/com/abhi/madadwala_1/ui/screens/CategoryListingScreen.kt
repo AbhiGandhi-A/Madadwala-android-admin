@@ -117,9 +117,11 @@ fun CategoryListingScreen(
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("Search providers...", fontSize = 16.sp) },
+                                placeholder = { Text("Search providers...", fontSize = 16.sp, color = MadadwalaColors.Gray) },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = TextFieldDefaults.colors(
+                                    focusedTextColor = MadadwalaColors.Ink,
+                                    unfocusedTextColor = MadadwalaColors.Ink,
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
@@ -153,7 +155,8 @@ fun CategoryListingScreen(
                                         text = category,
                                         style = MaterialTheme.typography.titleLarge.copy(
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 20.sp
+                                            fontSize = 20.sp,
+                                            color = MadadwalaColors.Ink
                                         )
                                     )
                                     Text(

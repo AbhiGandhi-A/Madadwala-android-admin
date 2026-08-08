@@ -58,15 +58,13 @@ class CallViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun initializeSocket() {
-        if (SocketHandler.getSocket() == null) {
-            // Using the same Render URL as tracking for consistency
-            SocketHandler.setSocket("https://madadwala-backend.onrender.com")
-        }
+        // Ensure we always have the socket set with the correct URL tracked in SocketHandler
+        SocketHandler.setSocket("https://madadwala-backend.onrender.com")
         
         val socket = SocketHandler.getSocket()
         SocketHandler.establishConnection() // Always try to connect
         
-        socket?.off(Socket.EVENT_CONNECT)
+        // Use a safe way to add EVENT_CONNECT without clearing others
         socket?.on(Socket.EVENT_CONNECT) {
             val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
             currentUser?.uid?.let { uid ->

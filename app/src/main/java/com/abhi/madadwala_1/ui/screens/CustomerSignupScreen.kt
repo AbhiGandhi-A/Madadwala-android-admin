@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -163,6 +164,16 @@ fun CustomerSignupScreen(
                 readOnly = true
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            var referralCode by remember { mutableStateOf("") }
+            FormTextField(
+                value = referralCode,
+                onValueChange = { referralCode = it.uppercase() },
+                label = "Referral Code (Optional)",
+                leadingIcon = { Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = MadadwalaColors.Green) }
+            )
+
             Spacer(modifier = Modifier.height(48.dp))
 
             PrimaryButton(
@@ -176,6 +187,7 @@ fun CustomerSignupScreen(
                         name = name,
                         email = if (email.isEmpty()) null else email,
                         category = null,
+                        referralCode = referralCode.ifBlank { null },
                         profileImageUri = profileImageUri,
                         aadhaarImageUri = null
                     )

@@ -64,11 +64,12 @@ fun LiveTrackingScreen(
     var booking by remember { mutableStateOf<BookingResponse?>(null) }
     var provider by remember { mutableStateOf<ProviderResponse?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    var durationText by remember { mutableStateOf("Calculating...") }
+    var durationText by remember { mutableStateOf("Partner has not started the ride") }
     var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var partnerLocation by remember { mutableStateOf<LatLng?>(null) }
     var lastKnownOtp by remember { mutableStateOf<String?>(null) }
     var showDetailsSheet by remember { mutableStateOf(false) }
+    var showChatSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     
@@ -78,10 +79,17 @@ fun LiveTrackingScreen(
 
     // Socket Setup
     LaunchedEffect(bookingId) {
-        SocketHandler.setSocket("https://madadwala-socket.onrender.com") // Placeholder
+        SocketHandler.setSocket("https://madadwala-backend.onrender.com")
         SocketHandler.establishConnection()
         val socket = SocketHandler.getSocket()
-        socket?.emit("join_booking", bookingId)
+        
+        socket?.on(io.socket.client.Socket.EVENT_CONNECT) {
+            socket.emit("join_booking", bookingId)
+        }
+        
+        if (socket?.connected() == true) {
+            socket.emit("join_booking", bookingId)
+        }
         
         socket?.on("location_update") { args ->
             android.util.Log.d("Madadwala", "Socket location_update received")
@@ -196,15 +204,15 @@ fun LiveTrackingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Track Partner", fontWeight = FontWeight.Bold) },
+                title = { Text("Track Partner", fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MadadwalaColors.Ink)
                     }
                 },
                 actions = {
                     IconButton(onClick = { /* Help */ }) {
-                        Icon(Icons.Default.HelpOutline, contentDescription = "Help")
+                        Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = MadadwalaColors.Ink)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -217,313 +225,320 @@ fun LiveTrackingScreen(
                 CircularProgressIndicator(color = MadadwalaColors.Green)
             }
         } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                // Partner Info Card
-                PartnerInfoCard(provider, bookingId, booking, callViewModel)
-
-                // Map View
-                Box(
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                 ) {
-                    GoogleMap(
-                        modifier = Modifier.fillMaxSize(),
-                        cameraPositionState = cameraPositionState,
-                        uiSettings = MapUiSettings(
-                            zoomControlsEnabled = false,
-                            scrollGesturesEnabled = false,
-                            tiltGesturesEnabled = false,
-                            rotationGesturesEnabled = false
-                        )
+                    // Partner Info Card
+                    PartnerInfoCard(provider, bookingId, booking, callViewModel, onChatClick = { showChatSheet = true })
+
+                    // Map View
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
                     ) {
-                        booking?.let { b ->
-                            val customerLoc = LatLng(b.customerLat ?: 21.6264, b.customerLng ?: 73.0152)
-                            val providerLoc = partnerLocation ?: if (b.providerLat != null && b.providerLng != null) LatLng(b.providerLat, b.providerLng) else null
-
-                            Marker(
-                                state = MarkerState(position = customerLoc),
-                                title = "Your Location"
+                        GoogleMap(
+                            modifier = Modifier.fillMaxSize(),
+                            cameraPositionState = cameraPositionState,
+                            uiSettings = MapUiSettings(
+                                zoomControlsEnabled = false,
+                                scrollGesturesEnabled = false,
+                                tiltGesturesEnabled = false,
+                                rotationGesturesEnabled = false
                             )
+                        ) {
+                            booking?.let { b ->
+                                val customerLoc = LatLng(b.customerLat ?: 21.6264, b.customerLng ?: 73.0152)
+                                val providerLoc = partnerLocation ?: if (b.providerLat != null && b.providerLng != null) LatLng(b.providerLat, b.providerLng) else null
 
-                            providerLoc?.let { loc ->
                                 Marker(
-                                    state = MarkerState(position = loc),
-                                    title = b.providerName ?: "Partner",
-                                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                                    state = MarkerState(position = customerLoc),
+                                    title = "Your Location"
                                 )
 
-                                if (routePoints.isNotEmpty()) {
-                                    Polyline(
-                                        points = routePoints,
-                                        color = Color(0xFFF59E0B), // Orange to match theme
-                                        width = 12f,
-                                        jointType = JointType.ROUND
+                                providerLoc?.let { loc ->
+                                    Marker(
+                                        state = MarkerState(position = loc),
+                                        title = b.providerName ?: "Partner",
+                                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
                                     )
+
+                                    if (routePoints.isNotEmpty()) {
+                                        Polyline(
+                                            points = routePoints,
+                                            color = Color(0xFFF59E0B), // Orange to match theme
+                                            width = 12f,
+                                            jointType = JointType.ROUND
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    }
-                    
-                    // Time overlay on map
-                    Surface(
-                        modifier = Modifier.align(Alignment.Center).padding(bottom = 40.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White,
-                        shadowElevation = 4.dp,
-                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.TwoWheeler, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            val awaySuffix = if (durationText != "Calculating...") " away" else ""
-                            Text(text = "$durationText$awaySuffix", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFF59E0B))
-                        }
-                    }
-                }
-
-                // Bottom Content
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // Partner Status Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = when(booking?.status) {
-                                    "accepted" -> "Partner Accepted Your Request"
-                                    "on_the_way" -> "Partner is on the way"
-                                    "arrived" -> "Partner Has Arrived"
-                                    "in_progress" -> "Work In Progress"
-                                    "done" -> "Job Completed"
-                                    else -> "Connecting..."
-                                },
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Text(
-                                text = "Your partner is getting ready to arrive",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MadadwalaColors.Gray
-                            )
                         }
                         
+                        // Time overlay on map
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFFFF7ED), // Light orange background
-                            modifier = Modifier.size(width = 80.dp, height = 70.dp)
+                            modifier = Modifier.align(Alignment.Center).padding(bottom = 40.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color.White,
+                            shadowElevation = 4.dp,
+                            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier.padding(4.dp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val displayTime = remember(durationText) {
-                                    if (durationText.contains("hour")) {
-                                        val parts = durationText.split(" ")
-                                        // Format "1 hour 27 min" -> "1.5" approx or just "1h 27m"
-                                        val h = parts.getOrNull(0) ?: ""
-                                        val m = parts.getOrNull(2) ?: ""
-                                        "${h}h ${m}m"
-                                    } else {
-                                        durationText.split(" ")[0]
-                                    }
-                                }
-                                
-                                val unitText = remember(durationText) {
-                                    if (durationText.contains("hour")) ""
-                                    else if (durationText.contains("min")) "min" 
-                                    else if (durationText.contains("km")) "km" 
-                                    else ""
-                                }
-
-                                Text(
-                                    text = displayTime,
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold, 
-                                        color = Color(0xFFF59E0B),
-                                        fontSize = if (displayTime.length > 3) 16.sp else 20.sp
-                                    ),
-                                    textAlign = TextAlign.Center
-                                )
-                                if (unitText.isNotEmpty()) {
-                                    Text(
-                                        text = unitText,
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
-                                        color = Color(0xFFF59E0B)
-                                    )
-                                }
-                                Text(
-                                    text = "away",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = Color(0xFFF59E0B)
-                                )
+                                Icon(Icons.Default.TwoWheeler, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                val awaySuffix = if (durationText != "Partner has not started the ride") " away" else ""
+                                Text(text = "$durationText$awaySuffix", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFF59E0B), textAlign = TextAlign.Center)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Progress Bar
-                    TrackingProgressBar(
-                        currentStep = when(booking?.status) {
-                            "accepted" -> 0
-                            "on_the_way" -> 1
-                            "arrived", "in_progress" -> 2
-                            "done" -> 3
-                            else -> 0
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Notification Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
-                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
-                    ) {
+                    // Bottom Content
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        // Partner Status Header
                         Row(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier.size(40.dp).clip(CircleShape).background(MadadwalaColors.Green),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.ElectricBolt, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
+                                val isUnpaidDone = booking?.status == "done" && booking?.paymentStatus != "paid"
                                 Text(
-                                    text = "We'll notify you once your partner is nearby",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
+                                    text = when {
+                                        isUnpaidDone -> "Service Completed"
+                                        booking?.status == "accepted" -> "Partner Accepted Your Request"
+                                        booking?.status == "on_the_way" -> "Partner is on the way"
+                                        booking?.status == "arrived" -> "Partner Has Arrived"
+                                        booking?.status == "in_progress" -> "Work In Progress"
+                                        booking?.status == "done" -> "Job Completed"
+                                        else -> "Connecting..."
+                                    },
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                                 )
                                 Text(
-                                    text = "You can contact your partner for any help.",
-                                    fontSize = 12.sp,
+                                    text = if (isUnpaidDone) "Please complete the payment to proceed" else "Your partner is getting ready to arrive",
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MadadwalaColors.Gray
                                 )
                             }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Order Details
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            DetailItem(
-                                icon = Icons.Default.LocationOn,
-                                title = "Service Address",
-                                subtitle = booking?.address ?: "Address not available",
-                                iconColor = MadadwalaColors.Green,
-                                actionText = "View",
-                                onActionClick = {
-                                    booking?.let { b ->
-                                        if (b.customerLat != null && b.customerLng != null) {
-                                            val uri = android.net.Uri.parse("geo:0,0?q=${b.customerLat},${b.customerLng}(Service Location)")
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
-                                            intent.setPackage("com.google.android.apps.maps")
-                                            context.startActivity(intent)
+                            
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFFFF7ED), // Light orange background
+                                modifier = Modifier.size(width = 80.dp, height = 70.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.padding(4.dp)
+                                ) {
+                                    val displayTime = remember(durationText) {
+                                        if (durationText == "Partner has not started the ride") {
+                                            "Not Started"
+                                        } else if (durationText.contains("hour")) {
+                                            val parts = durationText.split(" ")
+                                            // Format "1 hour 27 min" -> "1.5" approx or just "1h 27m"
+                                            val h = parts.getOrNull(0) ?: ""
+                                            val m = parts.getOrNull(2) ?: ""
+                                            "${h}h ${m}m"
+                                        } else {
+                                            durationText.split(" ")[0]
                                         }
                                     }
-                                }
-                            )
-                            
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF3F4F6))
+                                    
+                                    val unitText = remember(durationText) {
+                                        if (durationText.contains("hour")) ""
+                                        else if (durationText.contains("min")) "min" 
+                                        else if (durationText.contains("km")) "km" 
+                                        else ""
+                                    }
 
-                            DetailItem(
-                                icon = Icons.Default.Flag,
-                                title = "Service Type",
-                                subtitle = booking?.serviceName ?: "Service",
-                                iconColor = Color(0xFFF59E0B)
-                            )
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF3F4F6))
-
-                            val isPaymentPending = booking?.paymentStatus?.lowercase() == "pending"
-                            DetailItem(
-                                icon = Icons.Default.Payments,
-                                title = "Order Value",
-                                subtitle = "₹${booking?.totalAmount ?: 0.0}",
-                                iconColor = MadadwalaColors.Green,
-                                extraInfo = if (isPaymentPending) "Pending" else "Paid",
-                                extraInfoColor = if (isPaymentPending) Color(0xFFF59E0B) else MadadwalaColors.Green,
-                                actionText = if (isPaymentPending) "Pay Now" else null,
-                                onActionClick = {
-                                    if (isPaymentPending) {
-                                        onPayNow(bookingId)
+                                    Text(
+                                        text = displayTime,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold, 
+                                            color = Color(0xFFF59E0B),
+                                            fontSize = if (displayTime.length > 3) 16.sp else 20.sp
+                                        ),
+                                        textAlign = TextAlign.Center
+                                    )
+                                    if (unitText.isNotEmpty()) {
+                                        Text(
+                                            text = unitText,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                                            color = Color(0xFFF59E0B)
+                                        )
+                                    }
+                                    if (durationText != "Partner has not started the ride") {
+                                        Text(
+                                            text = "away",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                            color = Color(0xFFF59E0B)
+                                        )
                                     }
                                 }
-                            )
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF3F4F6))
-
-                            DetailItem(
-                                icon = Icons.Default.Receipt,
-                                title = "Order ID",
-                                subtitle = "#${booking?._id?.takeLast(10)?.uppercase() ?: "ID"}",
-                                iconColor = Color(0xFF3B82F6),
-                                actionText = "View Details",
-                                onActionClick = { showDetailsSheet = true }
-                            )
+                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                    // Safety Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
-                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        // Progress Bar
+                        TrackingProgressBar(
+                            currentStep = when(booking?.status) {
+                                "accepted" -> 0
+                                "on_the_way" -> 1
+                                "arrived", "in_progress" -> 2
+                                "done" -> 3
+                                else -> 0
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Notification Card
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
+                            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
                         ) {
-                            Box(
-                                modifier = Modifier.size(40.dp).clip(CircleShape).background(MadadwalaColors.Green),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Shield, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(MadadwalaColors.Green),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.ElectricBolt, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column {
+                                    Text(
+                                        text = "We'll notify you once your partner is nearby",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "You can contact your partner for any help.",
+                                        fontSize = 12.sp,
+                                        color = MadadwalaColors.Gray
+                                    )
+                                }
                             }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text(
-                                    text = "Your safety is our priority",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = MadadwalaColors.Green
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Order Details
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                DetailItem(
+                                    icon = Icons.Default.LocationOn,
+                                    title = "Service Address",
+                                    subtitle = booking?.address ?: "Address not available",
+                                    iconColor = MadadwalaColors.Green,
+                                    actionText = "View",
+                                    onActionClick = {
+                                        booking?.let { b ->
+                                            if (b.customerLat != null && b.customerLng != null) {
+                                                val uri = android.net.Uri.parse("geo:0,0?q=${b.customerLat},${b.customerLng}(Service Location)")
+                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                                                intent.setPackage("com.google.android.apps.maps")
+                                                context.startActivity(intent)
+                                            }
+                                        }
+                                    }
                                 )
-                                Text(
-                                    text = "All partners are background verified for your safety.",
-                                    fontSize = 12.sp,
-                                    color = MadadwalaColors.Gray
+                                
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF3F4F6))
+
+                                DetailItem(
+                                    icon = Icons.Default.Flag,
+                                    title = "Service Type",
+                                    subtitle = booking?.serviceName ?: "Service",
+                                    iconColor = Color(0xFFF59E0B)
+                                )
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF3F4F6))
+
+                                val isPaymentPending = booking?.paymentStatus?.lowercase() == "pending"
+                                DetailItem(
+                                    icon = Icons.Default.Payments,
+                                    title = "Order Value",
+                                    subtitle = "₹${booking?.totalAmount ?: 0.0}",
+                                    iconColor = MadadwalaColors.Green,
+                                    extraInfo = if (isPaymentPending) "Pending" else "Paid",
+                                    extraInfoColor = if (isPaymentPending) Color(0xFFF59E0B) else MadadwalaColors.Green,
+                                    actionText = if (isPaymentPending) "Pay Now" else null,
+                                    onActionClick = {
+                                        if (isPaymentPending) {
+                                            onPayNow(bookingId)
+                                        }
+                                    }
+                                )
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF3F4F6))
+
+                                DetailItem(
+                                    icon = Icons.Default.Receipt,
+                                    title = "Order ID",
+                                    subtitle = "#${booking?._id?.takeLast(10)?.uppercase() ?: "ID"}",
+                                    iconColor = Color(0xFF3B82F6),
+                                    actionText = "View Details",
+                                    onActionClick = { showDetailsSheet = true }
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Safety Card
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
+                            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(MadadwalaColors.Green),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Shield, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column {
+                                    Text(
+                                        text = "Your safety is our priority",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = MadadwalaColors.Green
+                                    )
+                                    Text(
+                                        text = "All partners are background verified for your safety.",
+                                        fontSize = 12.sp,
+                                        color = MadadwalaColors.Gray
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(80.dp)) // Extra space for floating button
                     }
-                    
-                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
         }
@@ -538,6 +553,13 @@ fun LiveTrackingScreen(
         ) {
             OrderDetailsSheetContent(booking!!, onDismiss = { showDetailsSheet = false })
         }
+    }
+
+    if (showChatSheet) {
+        com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
+            bookingId = bookingId,
+            onDismiss = { showChatSheet = false }
+        )
     }
 }
 
@@ -607,7 +629,8 @@ fun PartnerInfoCard(
     provider: ProviderResponse?,
     bookingId: String,
     booking: BookingResponse?,
-    callViewModel: CallViewModel
+    callViewModel: CallViewModel,
+    onChatClick: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -708,7 +731,7 @@ fun PartnerInfoCard(
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(onClick = { /* Chat */ },
+                    IconButton(onClick = onChatClick,
                         modifier = Modifier.size(40.dp).background(Color(0xFFF3F4F6), CircleShape)
                     ) {
                         Icon(Icons.Default.Chat, contentDescription = "Chat", tint = MadadwalaColors.Green, modifier = Modifier.size(20.dp))
@@ -722,7 +745,7 @@ fun PartnerInfoCard(
 
 @Composable
 fun TrackingProgressBar(currentStep: Int) {
-    val steps = listOf("Preparing", "On the way", "Arriving soon", "Completed")
+    val steps = listOf("Preparing", "On the way", "Arrived", "Completed")
     val icons = listOf(Icons.Default.ShoppingBag, Icons.Default.TwoWheeler, Icons.Default.LocationOn, Icons.Default.Check)
 
     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {

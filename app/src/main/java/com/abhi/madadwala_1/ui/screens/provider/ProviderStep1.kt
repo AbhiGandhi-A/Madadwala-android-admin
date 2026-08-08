@@ -34,7 +34,7 @@ data class ServiceCategory(
 @Composable
 fun ProviderStep1(
     phoneNumber: String,
-    onNext: (category: String, name: String, email: String, experience: String, address: String) -> Unit
+    onNext: (category: String, name: String, email: String, experience: String, address: String, referralCode: String?) -> Unit
 ) {
     val categories = listOf(
         ServiceCategory("1", "Cleaning", Icons.Default.CleaningServices),
@@ -100,13 +100,23 @@ fun ProviderStep1(
             modifier = Modifier.height(100.dp)
         )
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        var referralCode by remember { mutableStateOf("") }
+        FormTextField(
+            value = referralCode,
+            onValueChange = { referralCode = it.uppercase() },
+            label = "Referral Code (Optional)",
+            leadingIcon = { Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = MadadwalaColors.Green) }
+        )
+
         Spacer(modifier = Modifier.height(32.dp))
 
         PrimaryButton(
             text = "Next: KYC Verification",
             onClick = { 
                 val categoryName = categories.find { it.id == selectedCategoryId }?.name ?: ""
-                onNext(categoryName, name, email, experience, address) 
+                onNext(categoryName, name, email, experience, address, referralCode.ifBlank { null })
             },
             enabled = selectedCategoryId != null && name.isNotBlank() && experience.isNotBlank() && address.isNotBlank()
         )

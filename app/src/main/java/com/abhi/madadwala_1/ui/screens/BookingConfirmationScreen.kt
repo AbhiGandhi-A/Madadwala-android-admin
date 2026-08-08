@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +28,7 @@ import coil.compose.AsyncImage
 import com.abhi.madadwala_1.data.remote.BookingResponse
 import com.abhi.madadwala_1.data.remote.ProviderDetailResponse
 import com.abhi.madadwala_1.data.remote.RetrofitClient
+import com.abhi.madadwala_1.ui.theme.MadadwalaColors
 import com.abhi.madadwala_1.ui.viewmodel.CallViewModel
 import com.abhi.madadwala_1.utils.NotificationHelper
 import kotlinx.coroutines.launch
@@ -91,6 +93,23 @@ fun BookingConfirmationScreen(
                             partnerName = b.providerName ?: "Partner"
                         )
                     }
+                },
+                onCancel = {
+                    scope.launch {
+                        val res = RetrofitClient.apiService.cancelBooking(bookingId, mapOf("cancelledBy" to "customer"))
+                        if (res.isSuccessful) {
+                            onHome()
+                        }
+                    }
+                },
+                onReschedule = { newTime ->
+                    scope.launch {
+                        val res = RetrofitClient.apiService.rescheduleBooking(bookingId, mapOf("scheduledTime" to newTime))
+                        if (res.isSuccessful) {
+                            val response = RetrofitClient.apiService.getBookingDetails(bookingId)
+                            if (response.isSuccessful) booking = response.body()
+                        }
+                    }
                 }
             )
         } else {
@@ -113,8 +132,13 @@ fun ConfirmedBookingUI(
     providerDetail: ProviderDetailResponse?,
     onTrackLive: () -> Unit,
     onHome: () -> Unit,
-    onCall: () -> Unit
+    onCall: () -> Unit,
+    onCancel: () -> Unit,
+    onReschedule: (String) -> Unit
 ) {
+    var showCancelDialog by remember { mutableStateOf(false) }
+    var showRescheduleDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -145,12 +169,12 @@ fun ConfirmedBookingUI(
                 text = "Booking Confirmed!",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF2E7D4F)
+                color = MadadwalaColors.Green
             )
             Text(
                 text = "Your service provider is assigned and will reach you soon.",
                 textAlign = TextAlign.Center,
-                color = Color(0xFF757575),
+                color = MadadwalaColors.Gray,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
@@ -312,9 +336,189 @@ fun ConfirmedBookingUI(
         }
 
         TextButton(onClick = onHome, modifier = Modifier.height(36.dp)) {
-            Text("Back to Home", color = Color(0xFF2E7D4F), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("Back to Home", color = MadadwalaColors.Green, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = { showRescheduleDialog = true },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.Default.EditCalendar, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Gray)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Reschedule", color = Color.Gray)
+            }
+            OutlinedButton(
+                onClick = { showCancelDialog = true },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Red)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cancel", color = Color.Red)
+            }
         }
     }
+
+    if (showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            title = { Text("Cancel Booking?", fontWeight = FontWeight.Bold) },
+            text = { 
+                Column {
+                    Text("Are you sure you want to cancel this booking?")
+                    if (booking.paymentStatus == "paid") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Since you've already paid, the full amount (₹${booking.totalAmount}) will be refunded to your wallet instantly.",
+                            color = Color(0xFF2E7D4F),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelDialog = false
+                        onCancel()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Confirm Cancel")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelDialog = false }) {
+                    Text("No, keep it")
+                }
+            }
+        )
+    }
+
+    if (showRescheduleDialog) {
+        RescheduleDialog(
+            currentSlot = booking.scheduledTime,
+            onDismiss = { showRescheduleDialog = false },
+            onConfirm = { newTime ->
+                showRescheduleDialog = false
+                onReschedule(newTime)
+            }
+        )
+    }
+}
+
+@Composable
+fun RescheduleDialog(
+    currentSlot: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    val calendar = Calendar.getInstance()
+    val todayDate = calendar.time
+    
+    val dates = (0..6).map { 
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DAY_OF_YEAR, it)
+        cal.time
+    }
+    
+    val dateFormat = SimpleDateFormat("EEE, dd MMM yyyy", Locale.ENGLISH)
+    val dayNumFormat = SimpleDateFormat("dd", Locale.ENGLISH)
+    val dayNameFormat = SimpleDateFormat("EEE", Locale.ENGLISH)
+
+    var selectedDate by remember { mutableStateOf(todayDate) }
+    var selectedTime by remember { mutableStateOf("09:00 AM") }
+
+    val timeSlots = listOf(
+        "09:00 AM", "10:00 AM", "11:00 AM",
+        "12:00 PM", "01:00 PM", "02:00 PM",
+        "03:00 PM", "04:00 PM", "05:00 PM",
+        "06:00 PM", "07:00 PM", "08:00 PM"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reschedule Service", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Text("Select a new date and time", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(dates) { date ->
+                        val isSelected = SimpleDateFormat("yyyyMMdd", Locale.ENGLISH).format(date) == 
+                                       SimpleDateFormat("yyyyMMdd", Locale.ENGLISH).format(selectedDate)
+                        
+                        Surface(
+                            onClick = { selectedDate = date },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) Color(0xFF2E7D4F) else Color.White,
+                            border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray),
+                            modifier = Modifier.size(width = 50.dp, height = 60.dp)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(dayNumFormat.format(date), fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else Color.Black)
+                                Text(dayNameFormat.format(date), fontSize = 10.sp, color = if (isSelected) Color.White else Color.Gray)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Available Slots", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    timeSlots.chunked(3).forEach { rowSlots ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowSlots.forEach { slot ->
+                                val isSelected = selectedTime == slot
+                                Surface(
+                                    onClick = { selectedTime = slot },
+                                    modifier = Modifier.weight(1f).height(36.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) Color(0xFF2E7D4F).copy(alpha = 0.1f) else Color.White,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF2E7D4F) else Color.LightGray)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(slot, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) Color(0xFF2E7D4F) else Color.Black)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm("${dateFormat.format(selectedDate)} | $selectedTime")
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D4F))
+            ) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color.Gray)
+            }
+        }
+    )
 }
 
 @Composable

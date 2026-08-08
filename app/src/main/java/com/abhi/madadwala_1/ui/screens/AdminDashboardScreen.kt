@@ -318,6 +318,8 @@ fun ProviderRequestsTab() {
     var requests by remember { mutableStateOf<List<UserResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedRequest by remember { mutableStateOf<UserResponse?>(null) }
+    var showRejectDialog by remember { mutableStateOf<UserResponse?>(null) }
+    var rejectionReason by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     val fetchRequests: suspend () -> Unit = {
@@ -375,7 +377,7 @@ fun ProviderRequestsTab() {
                             Spacer(modifier = Modifier.height(16.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
-                                    onClick = { /* Reject logic */ },
+                                    onClick = { showRejectDialog = request },
                                     modifier = Modifier.weight(1f),
                                     colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Red.copy(alpha = 0.1f), contentColor = MadadwalaColors.Red),
                                     shape = RoundedCornerShape(12.dp)
@@ -404,6 +406,50 @@ fun ProviderRequestsTab() {
             }
         }
 
+        if (showRejectDialog != null) {
+            AlertDialog(
+                onDismissRequest = { showRejectDialog = null },
+                title = { Text("Reject Application") },
+                text = {
+                    Column {
+                        Text("Reason for rejection:")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = rejectionReason,
+                            onValueChange = { rejectionReason = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("e.g. Blurry Aadhaar image") },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val res = RetrofitClient.apiService.rejectProvider(mapOf(
+                                        "uid" to showRejectDialog!!.uid,
+                                        "reason" to rejectionReason
+                                    ))
+                                    if (res.isSuccessful) {
+                                        showRejectDialog = null
+                                        rejectionReason = ""
+                                        fetchRequests()
+                                    }
+                                } catch (e: Exception) {}
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Red),
+                        enabled = rejectionReason.isNotBlank()
+                    ) { Text("Confirm Reject") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRejectDialog = null }) { Text("Cancel") }
+                }
+            )
+        }
+
         // Details Overlay
         AnimatedVisibility(
             visible = selectedRequest != null,
@@ -414,6 +460,10 @@ fun ProviderRequestsTab() {
                 RequestDetailDialog(
                     request = request,
                     onDismiss = { selectedRequest = null },
+                    onReject = { 
+                        showRejectDialog = request
+                        selectedRequest = null 
+                    },
                     onApprove = {
                         scope.launch {
                             try {
@@ -433,7 +483,7 @@ fun ProviderRequestsTab() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RequestDetailDialog(request: UserResponse, onDismiss: () -> Unit, onApprove: () -> Unit) {
+fun RequestDetailDialog(request: UserResponse, onDismiss: () -> Unit, onReject: () -> Unit, onApprove: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MadadwalaColors.Cream
@@ -515,7 +565,7 @@ fun RequestDetailDialog(request: UserResponse, onDismiss: () -> Unit, onApprove:
             ) {
                 Row(modifier = Modifier.padding(20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
-                        onClick = onDismiss,
+                        onClick = onReject,
                         modifier = Modifier.weight(1f).height(52.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Red.copy(alpha = 0.1f), contentColor = MadadwalaColors.Red),
                         shape = RoundedCornerShape(12.dp)

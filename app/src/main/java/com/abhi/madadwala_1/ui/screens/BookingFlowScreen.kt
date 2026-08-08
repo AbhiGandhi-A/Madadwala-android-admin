@@ -45,6 +45,21 @@ import com.abhi.madadwala_1.utils.AnalyticsHelper
 import com.abhi.madadwala_1.utils.NotificationHelper
 import java.text.SimpleDateFormat
 import java.util.*
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.asRequestBody
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import java.io.File
+import java.io.FileOutputStream
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +93,7 @@ fun BookingFlowScreen(
 
     // State for booking
     var issueDescription by remember { mutableStateOf("") }
+    var selectedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     
     // Detailed Address State
     var houseNo by remember { mutableStateOf("") }
@@ -111,12 +127,13 @@ fun BookingFlowScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("Book $serviceName") },
+                    title = { Text("Book $serviceName", color = MadadwalaColors.Ink, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { if (currentStep > 1) currentStep-- else onBack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MadadwalaColors.Ink)
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
                 )
                 StepProgressBar(currentStep = currentStep, totalSteps = totalSteps)
             }
@@ -132,7 +149,13 @@ fun BookingFlowScreen(
                 label = "StepTransition"
             ) { step ->
                 when (step) {
-                    1 -> Step1(issueDescription, onValueChange = { issueDescription = it }, onNext = { currentStep = 2 })
+                    1 -> Step1(
+                        value = issueDescription, 
+                        onValueChange = { issueDescription = it }, 
+                        selectedImages = selectedImages,
+                        onImagesSelected = { selectedImages = it },
+                        onNext = { currentStep = 2 }
+                    )
                     2 -> Step2(
                         houseNo = houseNo, onHouseNoChange = { houseNo = it; isUsingCurrentLocation = false },
                         area = area, onAreaChange = { area = it; isUsingCurrentLocation = false },
@@ -169,26 +192,33 @@ fun BookingFlowScreen(
                             scope.launch {
                                 isSubmitting = true
                                 try {
+                                    val customerUidBody = customerUid.toRequestBody("text/plain".toMediaTypeOrNull())
+                                    val customerNameBody = customerName.toRequestBody("text/plain".toMediaTypeOrNull())
+                                    val providerUidBody = providerUid.toRequestBody("text/plain".toMediaTypeOrNull())
+                                    val serviceNameBody = serviceName.toRequestBody("text/plain".toMediaTypeOrNull())
+                                    val addressBody = fullAddress.toRequestBody("text/plain".toMediaTypeOrNull())
+                                    val scheduledTimeBody = selectedTime.toRequestBody("text/plain".toMediaTypeOrNull())
+                                    val totalAmountBody = price.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                                    val latBody = userLat.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                                    val lngBody = userLng.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                                    
+                                    val imageParts = selectedImages.mapNotNull { uri ->
+                                        val file = uriToFile(context, uri)
+                                        if (file != null) {
+                                            val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+                                            MultipartBody.Part.createFormData("issueImages", file.name, requestFile)
+                                        } else null
+                                    }
+
                                     val response = RetrofitClient.apiService.createBooking(
-                                        BookingRequest(
-                                            customerUid = customerUid,
-                                            customerName = customerName,
-                                            providerUid = providerUid,
-                                            serviceName = serviceName,
-                                            address = fullAddress,
-                                            scheduledTime = selectedTime,
-                                            totalAmount = price,
-                                            customerLat = userLat,
-                                            customerLng = userLng
-                                        )
+                                        customerUidBody, customerNameBody, providerUidBody, null,
+                                        serviceNameBody, addressBody, scheduledTimeBody, totalAmountBody,
+                                        latBody, lngBody, imageParts
                                     )
                                     if (response.isSuccessful) {
                                         val b = response.body()
                                         val bookingId = b?._id
                                         
-                                        // OTP notification moved to tracking/confirmation screen 
-                                        // only when provider reaches (status == "arrived")
-
                                         bookingId?.let { 
                                             analyticsHelper.logBookingEvent(it, serviceName, price)
                                             onBookingConfirmed(it) 
@@ -210,10 +240,39 @@ fun BookingFlowScreen(
     }
 }
 
+private fun uriToFile(context: android.content.Context, uri: Uri): File? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val file = File(context.cacheDir, "issue_${System.currentTimeMillis()}.jpg")
+        val outputStream = FileOutputStream(file)
+        inputStream.use { input ->
+            outputStream.use { output ->
+                input.copyTo(output)
+            }
+        }
+        file
+    } catch (e: Exception) {
+        null
+    }
+}
+
 @Composable
-fun Step1(value: String, onValueChange: (String) -> Unit, onNext: () -> Unit) {
+fun Step1(
+    value: String, 
+    onValueChange: (String) -> Unit, 
+    selectedImages: List<Uri>,
+    onImagesSelected: (List<Uri>) -> Unit,
+    onNext: () -> Unit
+) {
     val scrollState = rememberScrollState()
     val maxChars = 300
+    
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        val newList = (selectedImages + uris).take(5)
+        onImagesSelected(newList)
+    }
 
     Column(
         modifier = Modifier
@@ -337,46 +396,73 @@ fun Step1(value: String, onValueChange: (String) -> Unit, onNext: () -> Unit) {
 
         // Upload Photos Box
         Surface(
-            onClick = { /* TODO: Implement photo selection */ },
+            onClick = { if (selectedImages.size < 5) launcher.launch("image/*") },
             shape = RoundedCornerShape(16.dp),
             color = Color.Transparent,
-            border = BorderStroke(1.dp, MadadwalaColors.Teal.copy(alpha = 0.2f)), // Should be dotted if possible, but Compose border isn't easily dotted
+            border = BorderStroke(1.dp, MadadwalaColors.Teal.copy(alpha = 0.2f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MadadwalaColors.Teal.copy(alpha = 0.1f),
-                    modifier = Modifier.size(48.dp)
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.PhotoCamera,
-                            contentDescription = null,
-                            tint = MadadwalaColors.Teal,
-                            modifier = Modifier.size(24.dp)
+                    Surface(
+                        shape = CircleShape,
+                        color = MadadwalaColors.Teal.copy(alpha = 0.1f),
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.PhotoCamera,
+                                contentDescription = null,
+                                tint = MadadwalaColors.Teal,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            "Upload photos",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MadadwalaColors.Teal,
+                            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                        )
+                        Text(
+                            "Max 5 photos, up to 5 MB each",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MadadwalaColors.Gray
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        "Upload photos",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MadadwalaColors.Teal,
-                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
-                    )
-                    Text(
-                        "Max 5 photos, up to 5 MB each",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MadadwalaColors.Gray
-                    )
+                
+                if (selectedImages.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier.heightIn(max = 200.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(selectedImages) { uri ->
+                            Box(modifier = Modifier.size(100.dp).clip(RoundedCornerShape(8.dp))) {
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                IconButton(
+                                    onClick = { onImagesSelected(selectedImages.filter { it != uri }) },
+                                    modifier = Modifier.align(Alignment.TopEnd).size(24.dp).background(Color.Black.copy(0.5f), CircleShape)
+                                ) {
+                                    Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

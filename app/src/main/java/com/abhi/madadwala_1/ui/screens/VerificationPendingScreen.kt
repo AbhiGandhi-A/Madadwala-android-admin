@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,15 +51,15 @@ fun VerificationPendingScreen(
         Box(
             modifier = Modifier
                 .size(120.dp)
-                .scale(pulseScale)
+                .scale(if (user?.kycRejected == true) 1f else pulseScale)
                 .clip(CircleShape)
-                .background(MadadwalaColors.Teal.copy(alpha = 0.1f)),
+                .background((if (user?.kycRejected == true) MadadwalaColors.Red else MadadwalaColors.Teal).copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.HourglassEmpty,
+                imageVector = if (user?.kycRejected == true) Icons.Default.Cancel else Icons.Default.HourglassEmpty,
                 contentDescription = null,
-                tint = MadadwalaColors.Teal,
+                tint = if (user?.kycRejected == true) MadadwalaColors.Red else MadadwalaColors.Teal,
                 modifier = Modifier.size(64.dp)
             )
         }
@@ -66,17 +67,20 @@ fun VerificationPendingScreen(
         Spacer(modifier = Modifier.height(48.dp))
 
         Text(
-            text = "Your application is under review",
+            text = if (user?.kycRejected == true) "Application Rejected" else "Your application is under review",
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                color = if (user?.kycRejected == true) MadadwalaColors.Red else MadadwalaColors.Ink
             )
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "We're verifying your details. This usually takes 24-48 hours. You'll be notified once approved.",
+            text = if (user?.kycRejected == true) 
+                "Reason: ${user.kycRejectionReason ?: "Information provided was incorrect."}\nPlease go to your profile to update details."
+                else "We're verifying your details. This usually takes 24-48 hours. You'll be notified once approved.",
             style = MaterialTheme.typography.bodyLarge.copy(
                 color = MadadwalaColors.Gray,
                 textAlign = TextAlign.Center,
@@ -115,7 +119,7 @@ fun VerificationPendingScreen(
         Spacer(modifier = Modifier.height(48.dp))
 
         GhostButton(
-            text = "Refresh status",
+            text = if (user?.kycRejected == true) "Go to Dashboard" else "Refresh status",
             onClick = onRefresh
         )
 

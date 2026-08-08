@@ -19,6 +19,7 @@ sealed class ProviderDashboardState {
         val bookings: List<BookingResponse>,
         val transactions: List<TransactionResponse>,
         val services: List<ServiceResponse>,
+        val reviews: List<ReviewResponse> = emptyList(),
         val customRequests: List<CustomRequestResponse> = emptyList()
     ) : ProviderDashboardState()
     data class Error(val message: String) : ProviderDashboardState()
@@ -144,6 +145,7 @@ class ProviderViewModel : ViewModel() {
                         bookings = bookings,
                         transactions = transactions,
                         services = detailsResponse.body()?.services ?: emptyList(),
+                        reviews = detailsResponse.body()?.reviews ?: emptyList(),
                         customRequests = customRequests
                     )
                 } else if (showLoading) {
@@ -273,6 +275,23 @@ class ProviderViewModel : ViewModel() {
                     mapOf(
                         "providerUid" to user.uid,
                         "providerName" to (user.name ?: "Partner")
+                    )
+                )
+                if (response.isSuccessful) {
+                    loadDashboardData()
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun cancelBooking(bookingId: String, reason: String) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.cancelBooking(
+                    bookingId,
+                    mapOf(
+                        "reason" to reason,
+                        "cancelledBy" to "provider"
                     )
                 )
                 if (response.isSuccessful) {
