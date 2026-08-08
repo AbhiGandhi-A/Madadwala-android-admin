@@ -280,7 +280,8 @@ fun ChatSupportContent(
                                 Text(
                                     text = option.label,
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = MadadwalaColors.Green
                                 )
                             }
                         }

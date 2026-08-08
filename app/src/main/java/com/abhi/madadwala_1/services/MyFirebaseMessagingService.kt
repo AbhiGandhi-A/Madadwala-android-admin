@@ -36,10 +36,12 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             ?: remoteMessage.data["content"]
             ?: "You have a new update"
 
+        val bookingId = remoteMessage.data["bookingId"]
+
         scope.launch {
             try {
                 preferenceManager.incrementUnreadNotificationsCount()
-                preferenceManager.saveNotification(NotificationData(title, message))
+                preferenceManager.saveNotification(NotificationData(title, message, bookingId = bookingId))
                 Log.d("FCM", "Notification saved to local storage")
             } catch (e: Exception) {
                 Log.e("FCM", "Error saving notification", e)

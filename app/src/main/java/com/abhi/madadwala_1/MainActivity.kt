@@ -22,6 +22,7 @@ import com.razorpay.PaymentResultWithDataListener
 import com.razorpay.PaymentData
 import kotlinx.coroutines.launch
 import android.content.Intent
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     private lateinit var paymentViewModel: PaymentViewModel
@@ -58,13 +59,15 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         val preferenceManager = PreferenceManager(this)
         val title = intent.getStringExtra("title")
         val message = intent.getStringExtra("message") ?: intent.getStringExtra("body")
+        val bookingId = intent.getStringExtra("bookingId")
         
         if (title != null || message != null) {
             lifecycleScope.launch {
                 preferenceManager.saveNotification(
                     com.abhi.madadwala_1.data.NotificationData(
                         title ?: "New Notification",
-                        message ?: ""
+                        message ?: "",
+                        bookingId = bookingId
                     )
                 )
             }
@@ -96,16 +99,18 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         handleNotificationIntent(intent)
 
         lifecycleScope.launch {
-            preferenceManager.appLanguage.collect { code ->
-                val locale = java.util.Locale(code)
-                java.util.Locale.setDefault(locale)
-                val config = resources.configuration
-                if (config.locales[0].language != code) {
-                    config.setLocale(locale)
-                    resources.updateConfiguration(config, resources.displayMetrics)
-                    recreate()
+            preferenceManager.appLanguage
+                .distinctUntilChanged()
+                .collect { code ->
+                    val locale = java.util.Locale(code)
+                    java.util.Locale.setDefault(locale)
+                    val config = resources.configuration
+                    if (config.locales[0].language != code) {
+                        config.setLocale(locale)
+                        resources.updateConfiguration(config, resources.displayMetrics)
+                        recreate()
+                    }
                 }
-            }
         }
 
         paymentViewModel = ViewModelProvider(this)[PaymentViewModel::class.java]

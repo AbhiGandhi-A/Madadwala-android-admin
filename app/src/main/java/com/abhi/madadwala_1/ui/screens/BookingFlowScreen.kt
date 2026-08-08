@@ -112,7 +112,7 @@ fun BookingFlowScreen(
         else listOf(houseNo, area, city, selectedState, pincode).filter { it.isNotEmpty() }.joinToString(", ")
     }
     
-    var selectedTime by remember { mutableStateOf("ASAP") }
+    var selectedTime by remember { mutableStateOf("Urgent") }
     
     // Provider's existing bookings to disable slots
     var providerBookings by remember { mutableStateOf<List<BookingResponse>>(emptyList()) }
@@ -181,64 +181,74 @@ fun BookingFlowScreen(
                         providerBookings = providerBookings,
                         onNext = { currentStep = 4 }
                     )
-                    4 -> Step4(
-                        service = serviceName, 
-                        price = price, 
-                        address = fullAddress, 
-                        time = selectedTime, 
-                        issue = issueDescription,
-                        isLoading = isSubmitting, 
-                        onEditStep = { currentStep = it },
-                        onConfirm = {
-                            if (customerUid.isEmpty()) {
-                                Toast.makeText(context, "Session expired. Please login again.", Toast.LENGTH_SHORT).show()
-                                return@Step4
-                            }
-                            scope.launch {
-                                isSubmitting = true
-                                try {
-                                    val customerUidBody = customerUid.toRequestBody("text/plain".toMediaTypeOrNull())
-                                    val customerNameBody = customerName.toRequestBody("text/plain".toMediaTypeOrNull())
-                                    val providerUidBody = providerUid.toRequestBody("text/plain".toMediaTypeOrNull())
-                                    val serviceNameBody = serviceName.toRequestBody("text/plain".toMediaTypeOrNull())
-                                    val addressBody = fullAddress.toRequestBody("text/plain".toMediaTypeOrNull())
-                                    val scheduledTimeBody = selectedTime.toRequestBody("text/plain".toMediaTypeOrNull())
-                                    val totalAmountBody = price.toString().toRequestBody("text/plain".toMediaTypeOrNull())
-                                    val latBody = userLat.toString().toRequestBody("text/plain".toMediaTypeOrNull())
-                                    val lngBody = userLng.toString().toRequestBody("text/plain".toMediaTypeOrNull())
-                                    
-                                    val imageParts = selectedImages.mapNotNull { uri ->
-                                        val file = uriToFile(context, uri)
-                                        if (file != null) {
-                                            val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
-                                            MultipartBody.Part.createFormData("issueImages", file.name, requestFile)
-                                        } else null
-                                    }
-
-                                    val response = RetrofitClient.apiService.createBooking(
-                                        customerUidBody, customerNameBody, providerUidBody, null,
-                                        serviceNameBody, addressBody, scheduledTimeBody, totalAmountBody,
-                                        latBody, lngBody, imageParts
-                                    )
-                                    if (response.isSuccessful) {
-                                        val b = response.body()
-                                        val bookingId = b?._id
+                    4 -> {
+                        val user = (authState as? AuthState.Authenticated)?.user
+                        val referralDiscount = user?.pendingReferralDiscount ?: 0.0
+                        val finalPrice = (price - referralDiscount).coerceAtLeast(0.0)
+                        
+                        Step4(
+                            service = serviceName, 
+                            price = price, 
+                            referralDiscount = referralDiscount,
+                            address = fullAddress, 
+                            time = selectedTime, 
+                            issue = issueDescription,
+                            isLoading = isSubmitting, 
+                            onEditStep = { currentStep = it },
+                            onConfirm = {
+                                if (customerUid.isEmpty()) {
+                                    Toast.makeText(context, "Session expired. Please login again.", Toast.LENGTH_SHORT).show()
+                                    return@Step4
+                                }
+                                scope.launch {
+                                    isSubmitting = true
+                                    try {
+                                        val customerUidBody = customerUid.toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val customerNameBody = customerName.toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val providerUidBody = providerUid.toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val serviceNameBody = serviceName.toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val addressBody = fullAddress.toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val scheduledTimeBody = selectedTime.toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val totalAmountBody = finalPrice.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val latBody = userLat.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val lngBody = userLng.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                                         
-                                        bookingId?.let { 
-                                            analyticsHelper.logBookingEvent(it, serviceName, price)
-                                            onBookingConfirmed(it) 
+                                        val imageParts = selectedImages.mapNotNull { uri ->
+                                            val file = uriToFile(context, uri)
+                                            if (file != null) {
+                                                val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+                                                MultipartBody.Part.createFormData("issueImages", file.name, requestFile)
+                                            } else null
                                         }
-                                    } else {
-                                        Toast.makeText(context, "Booking failed: ${response.message()}", Toast.LENGTH_SHORT).show()
+
+                                        val response = RetrofitClient.apiService.createBooking(
+                                            customerUidBody, customerNameBody, providerUidBody, null,
+                                            serviceNameBody, addressBody, scheduledTimeBody, totalAmountBody,
+                                            latBody, lngBody, imageParts
+                                        )
+                                        if (response.isSuccessful) {
+                                            val b = response.body()
+                                            val bookingId = b?._id
+                                            
+                                            // Refresh auth state to update pendingReferralDiscount (it should be 0 now on server after first booking)
+                                            authViewModel.refresh()
+
+                                            bookingId?.let { 
+                                                analyticsHelper.logBookingEvent(it, serviceName, finalPrice)
+                                                onBookingConfirmed(it) 
+                                            }
+                                        } else {
+                                            Toast.makeText(context, "Booking failed: ${response.message()}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Network error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        isSubmitting = false
                                     }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Network error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    isSubmitting = false
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -965,6 +975,7 @@ fun Step3(
 fun Step4(
     service: String,
     price: Double,
+    referralDiscount: Double = 0.0,
     address: String,
     time: String,
     issue: String,
@@ -972,6 +983,7 @@ fun Step4(
     onEditStep: (Int) -> Unit,
     onConfirm: () -> Unit
 ) {
+    val finalPrice = (price - referralDiscount).coerceAtLeast(0.0)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1009,6 +1021,26 @@ fun Step4(
                     value = "$service (₹$price)",
                     onEdit = { onEditStep(1) }
                 )
+                
+                if (referralDiscount > 0) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
+                    SummaryRow(
+                        icon = Icons.Default.CardGiftcard,
+                        label = "Invite Coupon",
+                        value = "- ₹$referralDiscount",
+                        onEdit = { }
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
+                
+                SummaryRow(
+                    icon = Icons.Default.Payments,
+                    label = "Total Amount",
+                    value = "₹$finalPrice",
+                    onEdit = { }
+                )
+
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                 
                 SummaryRow(
@@ -1020,7 +1052,7 @@ fun Step4(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
 
                 val timeParts = time.split("|")
-                val displayDate = timeParts.getOrNull(0)?.trim() ?: "ASAP"
+                val displayDate = timeParts.getOrNull(0)?.trim() ?: "Urgent"
                 val displayTime = timeParts.getOrNull(1)?.trim() ?: ""
 
                 SummaryRow(

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -134,9 +135,9 @@ fun HomeScreen(
     val userName = user?.name ?: "User"
     val uid = user?.uid ?: ""
 
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var showLocationPicker by remember { mutableStateOf(false) }
-    var activeChatBookingId by remember { mutableStateOf<String?>(null) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var showLocationPicker by rememberSaveable { mutableStateOf(false) }
+    var activeChatBookingId by rememberSaveable { mutableStateOf<String?>(null) }
 
     BackHandler(enabled = selectedTab != 0 || showLocationPicker) {
         if (showLocationPicker) {
@@ -693,8 +694,8 @@ fun HomeTabContent(
     isProvidersLoading: Boolean = false,
     onChat: (String) -> Unit = {}
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    var sortOrder by remember { mutableStateOf("Default") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var sortOrder by rememberSaveable { mutableStateOf("Default") }
     val scope = rememberCoroutineScope()
 
     val filteredCategories = remember(categories, searchQuery, sortOrder) {
@@ -1454,12 +1455,12 @@ fun CategoriesTabContent(
     nearbyProviders: List<com.abhi.madadwala_1.data.remote.ProviderResponse> = emptyList()
 ) {
     var categories by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.CategoryResponse>>(emptyList()) }
-    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
-    var showDialog by remember { mutableStateOf(false) }
+    var selectedCategoryName by rememberSaveable { mutableStateOf<String?>(null) }
+    var showDialog by rememberSaveable { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
-    var searchQuery by remember { mutableStateOf("") }
-    var sortOrder by remember { mutableStateOf("Default") }
-    var showFilterSheet by remember { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var sortOrder by rememberSaveable { mutableStateOf("Default") }
+    var showFilterSheet by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val preferenceManager = remember { PreferenceManager(context) }
     val unreadCount by preferenceManager.unreadNotificationsCount.collectAsState(initial = 0)
@@ -2499,7 +2500,7 @@ fun getIconForCategory(iconName: String?): ImageVector {
 fun BookingsTabContent(uid: String, onNavigate: (String) -> Unit, callViewModel: CallViewModel, onChat: (String) -> Unit) {
     var bookings by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.BookingResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var selectedFilter by remember { mutableStateOf("All Bookings") }
+    var selectedFilter by rememberSaveable { mutableStateOf("All Bookings") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val preferenceManager = remember { PreferenceManager(context) }
@@ -2725,7 +2726,7 @@ fun BookingCardV2(
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
                             Text(
-                                "ASAP",
+                                "Urgent",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
@@ -2901,7 +2902,7 @@ fun BookingActionItem(icon: ImageVector, label: String, onClick: () -> Unit) {
 fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNavigate: (String) -> Unit) {
     val viewModel: com.abhi.madadwala_1.ui.viewmodel.WalletViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
-    var isBalanceVisible by remember { mutableStateOf(true) }
+    var isBalanceVisible by rememberSaveable { mutableStateOf(true) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -3044,15 +3045,7 @@ fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNav
 
                         item {
                             com.abhi.madadwala_1.ui.components.InviteEarnBanner(
-                                onInvite = {
-                                    val sendIntent: android.content.Intent = android.content.Intent().apply {
-                                        action = android.content.Intent.ACTION_SEND
-                                        putExtra(android.content.Intent.EXTRA_TEXT, "Hey! Download Madadwala and use my code ${state.walletId} to get rewards! https://madadwala.com/download")
-                                        type = "text/plain"
-                                    }
-                                    val shareIntent = android.content.Intent.createChooser(sendIntent, null)
-                                    context.startActivity(shareIntent)
-                                }
+                                onInvite = { onNavigate(Screen.InviteEarn.route) }
                             )
                             Spacer(modifier = Modifier.height(20.dp))
                         }
@@ -3074,9 +3067,9 @@ fun ProfileTabContent(
     onLogout: () -> Unit,
     onNavigate: (String) -> Unit
 ) {
-    var showEditProfile by remember { mutableStateOf(false) }
-    var showSavedAddresses by remember { mutableStateOf(false) }
-    var legalContentType by remember { mutableStateOf<String?>(null) }
+    var showEditProfile by rememberSaveable { mutableStateOf(false) }
+    var showSavedAddresses by rememberSaveable { mutableStateOf(false) }
+    var legalContentType by rememberSaveable { mutableStateOf<String?>(null) }
     var currentName by remember { mutableStateOf(name) }
     var offersCount by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -3146,7 +3139,7 @@ fun ProfileTabContent(
                             }
                         }
                     }
-                    var showHelpMenu by remember { mutableStateOf(false) }
+                    var showHelpMenu by rememberSaveable { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { showHelpMenu = true }) {
                             Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = "Help", tint = MadadwalaColors.Green)
@@ -3285,7 +3278,7 @@ fun ProfileTabContent(
                         Box(modifier = Modifier.width(1.dp).height(40.dp).background(MadadwalaColors.LightGray.copy(0.3f)))
                         ProfileStatItem(
                             icon = Icons.Default.LocalOffer,
-                            value = "$offersCount",
+                            value = "${offersCount + (if ((user?.pendingReferralDiscount ?: 0.0) > 0) 1 else 0)}",
                             label = "Coupons"
                         )
                     }
@@ -3341,7 +3334,7 @@ fun ProfileTabContent(
         item {
             ProfileSection("Promotions") {
                 ProfileOptionItem("Offers & Coupons", "View exclusive offers and coupons", Icons.Default.LocalOffer) { onNavigate(Screen.Offers.route) }
-                ProfileOptionItem("Invite & Earn", "Invite friends and earn rewards", Icons.Default.Group) { /* Share App */ }
+                ProfileOptionItem("Invite & Earn", "Invite friends and earn rewards", Icons.Default.Group) { onNavigate(Screen.InviteEarn.route) }
             }
         }
 
@@ -3613,7 +3606,7 @@ fun ProfileStatItem(icon: ImageVector, value: String, label: String, modifier: M
 fun SavedAddressesDialog(uid: String, onDismiss: () -> Unit) {
     var addresses by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.AddressResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var showMapPicker by remember { mutableStateOf(false) }
+    var showMapPicker by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {

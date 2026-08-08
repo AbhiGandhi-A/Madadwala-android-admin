@@ -17,4 +17,11 @@ object MadadwalaColors {
     val White = Color(0xFFFFFFFF)
     val Red = Color(0xFFDC4A3E)
     val Amber = Color(0xFFC98A1A)
+    val Purple = Color(0xFF9182C9)
+    val Orange = Color(0xFFFF9800)
+    val Blue = Color(0xFF2196F3)
+    val LightGreen = Color(0xFFE8F5E9)
+    val LightPurple = Color(0xFFF3E5F5)
+    val LightOrange = Color(0xFFFFF3E0)
+    val LightBlue = Color(0xFFE3F2FD)
 }

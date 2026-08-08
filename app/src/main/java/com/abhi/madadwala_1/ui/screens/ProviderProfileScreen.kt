@@ -43,9 +43,11 @@ import coil.compose.AsyncImage
 import com.abhi.madadwala_1.data.remote.ProviderDetailResponse
 import com.abhi.madadwala_1.data.remote.RetrofitClient
 import com.abhi.madadwala_1.data.remote.ServiceResponse
+import com.abhi.madadwala_1.ui.components.BookingChatBottomSheet
 import com.abhi.madadwala_1.ui.theme.MadadwalaColors
 import com.abhi.madadwala_1.ui.viewmodel.AuthState
 import com.abhi.madadwala_1.ui.viewmodel.AuthViewModel
+import com.abhi.madadwala_1.ui.viewmodel.CallViewModel
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -69,28 +71,56 @@ fun ProviderProfileScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     
-    val authViewModel: AuthViewModel = viewModel()
+    val authViewModel: AuthViewModel = viewModel(
+        viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity
+    )
     val authState by authViewModel.authState.collectAsState()
     val currentUser = (authState as? AuthState.Authenticated)?.user
+
+    val callViewModel: CallViewModel = viewModel(
+        viewModelStoreOwner = LocalContext.current as androidx.activity.ComponentActivity
+    )
 
     var showAllServices by remember { mutableStateOf(false) }
     var showAllReviews by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showChat by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = showAllServices || showAllReviews || showMenu || showReportDialog) {
+    BackHandler(enabled = showAllServices || showAllReviews || showMenu || showReportDialog || showChat) {
         showAllServices = false
         showAllReviews = false
         showMenu = false
         showReportDialog = false
+        showChat = false
     }
 
-    LaunchedEffect(providerUid) {
+    val interactionId = remember(currentUser?.uid, providerUid) {
+        val uid1 = currentUser?.uid ?: "guest"
+        val uid2 = providerUid
+        val seed = uid1 + uid2 // Unique to this User-Provider pair
+        val md5 = java.security.MessageDigest.getInstance("MD5")
+            .digest(seed.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        md5.take(24)
+    }
+
+    LaunchedEffect(providerUid, currentUser?.uid) {
         scope.launch {
             try {
                 val response = RetrofitClient.apiService.getProviderDetails(providerUid)
                 if (response.isSuccessful) {
                     detail = response.body()
+                }
+
+                // Initialize interaction on backend
+                if (currentUser != null) {
+                    RetrofitClient.trackingApiService.initInteraction(
+                        mapOf(
+                            "id" to interactionId,
+                            "participants" to listOf(currentUser.uid, providerUid)
+                        )
+                    )
                 }
             } catch (e: Exception) {
                 // Handle error
@@ -109,6 +139,13 @@ fun ProviderProfileScreen(
                 showReportDialog = false
                 Toast.makeText(context, "Report submitted successfully", Toast.LENGTH_SHORT).show()
             }
+        )
+    }
+
+    if (showChat) {
+        BookingChatBottomSheet(
+            bookingId = interactionId,
+            onDismiss = { showChat = false }
         )
     }
 
@@ -159,18 +196,24 @@ fun ProviderProfileScreen(
         bottomBar = {
             if (detail != null) {
                 BottomActionBar(
-                    onChat = { /* Chat functionality - placeholder as no chat screen found */ },
-                    onCall = { 
-                        // Note: ProviderResponse doesn't have phone number in this model
-                        // Use a dummy or handle if phone is available in another way
+                    onChat = {
+                        if (currentUser != null) {
+                            showChat = true
+                        } else {
+                            Toast.makeText(context, "Please login to chat", Toast.LENGTH_SHORT).show()
+                        }
                     },
-                    onDirections = {
-                        val provider = detail!!.provider
-                        if (provider.lat != null && provider.lng != null) {
-                            val gmmIntentUri = Uri.parse("geo:${provider.lat},${provider.lng}?q=${provider.lat},${provider.lng}(${provider.name})")
-                            val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-                            mapIntent.setPackage("com.google.android.apps.maps")
-                            context.startActivity(mapIntent)
+                    onCall = {
+                        val provider = detail?.provider
+                        if (provider != null && currentUser != null) {
+                            callViewModel.startCall(
+                                bookingId = interactionId,
+                                customerId = currentUser.uid,
+                                partnerId = provider.uid,
+                                partnerName = provider.name
+                            )
+                        } else if (currentUser == null) {
+                            Toast.makeText(context, "Please login to call", Toast.LENGTH_SHORT).show()
                         }
                     },
                     onBook = {
@@ -819,7 +862,6 @@ fun ReviewCard(review: com.abhi.madadwala_1.data.remote.ReviewResponse) {
 fun BottomActionBar(
     onChat: () -> Unit,
     onCall: () -> Unit,
-    onDirections: () -> Unit,
     onBook: () -> Unit
 ) {
     Surface(
@@ -837,8 +879,6 @@ fun BottomActionBar(
             ActionIconButton(icon = Icons.Default.Chat, label = "Chat", onClick = onChat)
             VerticalDivider(modifier = Modifier.height(32.dp).padding(horizontal = 4.dp), color = Color(0xFFF0F0F0))
             ActionIconButton(icon = Icons.Default.Call, label = "Call", onClick = onCall)
-            VerticalDivider(modifier = Modifier.height(32.dp).padding(horizontal = 4.dp), color = Color(0xFFF0F0F0))
-            ActionIconButton(icon = Icons.Default.Directions, label = "Directions", onClick = onDirections)
             
             Spacer(modifier = Modifier.width(8.dp))
 

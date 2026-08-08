@@ -555,7 +555,7 @@ fun formatDate(dateStr: String): String {
     if (dateStr.contains("|")) {
         return dateStr.split("|")[0].trim()
     }
-    if (dateStr.equals("ASAP", ignoreCase = true)) return "ASAP"
+    if (dateStr.equals("ASAP", ignoreCase = true) || dateStr.equals("Urgent", ignoreCase = true)) return "Urgent"
     
     return try {
         val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH)
@@ -580,7 +580,7 @@ fun formatTime(dateStr: String): String {
     if (dateStr.contains("|")) {
         return dateStr.split("|").last().trim()
     }
-    if (dateStr.equals("ASAP", ignoreCase = true)) return "ASAP"
+    if (dateStr.equals("ASAP", ignoreCase = true) || dateStr.equals("Urgent", ignoreCase = true)) return "Urgent"
 
     return try {
         val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH)

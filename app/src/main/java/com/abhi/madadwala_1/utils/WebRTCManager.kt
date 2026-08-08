@@ -201,11 +201,19 @@ class WebRTCManager(
         localAudioTrack?.setEnabled(!isMuted)
     }
 
+    @Synchronized
     fun stopCall() {
+        if (peerConnection == null && localAudioTrack == null && localAudioSource == null) return
+
         peerConnection?.close()
         peerConnection = null
-        localAudioSource?.dispose()
+        
         localAudioTrack?.dispose()
+        localAudioTrack = null
+        
+        localAudioSource?.dispose()
+        localAudioSource = null
+
         pendingIceCandidates.clear()
         
         // Reset audio settings

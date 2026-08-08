@@ -14,6 +14,7 @@ import com.abhi.madadwala_1.ui.screens.AdminDashboardScreen
 import com.abhi.madadwala_1.ui.viewmodel.AuthViewModel
 import com.abhi.madadwala_1.ui.viewmodel.AuthState
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.repeatOnLifecycle
 import android.app.Activity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
@@ -74,6 +75,7 @@ sealed class Screen(val route: String) {
     object TransactionHistory : Screen("transaction_history")
     object SendMoney : Screen("send_money")
     object VoiceCall : Screen("voice_call")
+    object InviteEarn : Screen("invite_earn")
 }
 
 @Composable
@@ -85,6 +87,7 @@ fun NavGraph(navController: NavHostController) {
     val authState by authViewModel.authState.collectAsState()
     val callState by callViewModel.callState.collectAsState()
     val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val analyticsHelper = remember { AnalyticsHelper(context) }
 
     LaunchedEffect(navController) {
@@ -96,43 +99,46 @@ fun NavGraph(navController: NavHostController) {
         }
     }
 
-    LaunchedEffect(Unit) {
-        val activity = context as? Activity
-        val bookingId = activity?.intent?.getStringExtra("bookingId")
-        val screen = activity?.intent?.getStringExtra("screen")
+    // Handle Intent-based navigation (Deep links / Notifications)
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            val activity = context as? Activity
+            val intent = activity?.intent
+            val bookingId = intent?.getStringExtra("bookingId")
+            val screen = intent?.getStringExtra("screen")
 
-        if (bookingId != null) {
-            when (screen) {
-                "active_job" -> navController.navigate(Screen.ProviderActiveJob.createRoute(bookingId))
-                "tracking" -> navController.navigate(Screen.LiveTracking.createRoute(bookingId))
-                "confirmation" -> navController.navigate(Screen.BookingConfirmation.createRoute(bookingId))
-                "voice_call" -> {
-                    val callId = activity.intent.getStringExtra("callId") ?: ""
-                    val callerName = activity.intent.getStringExtra("callerName") ?: "Partner"
-                    val callerImage = activity.intent.getStringExtra("callerImage")
-                    val callerId = activity.intent.getStringExtra("callerId") ?: ""
-
-                    if (callId.isNotEmpty()) {
-                        callViewModel.handleIncomingCallFromIntent(
-                            callId, callerName, callerImage, bookingId, callerId
-                        )
-                        // Trigger immediate navigation for full-screen intent case
-                        if (navController.currentDestination?.route != Screen.VoiceCall.route) {
-                            navController.navigate(Screen.VoiceCall.route)
-                        }
+            if (bookingId != null) {
+                when (screen) {
+                    "active_job" -> navController.navigate(Screen.ProviderActiveJob.createRoute(bookingId))
+                    "tracking" -> navController.navigate(Screen.LiveTracking.createRoute(bookingId))
+                    "confirmation" -> navController.navigate(Screen.BookingConfirmation.createRoute(bookingId))
+                    "chat" -> {
+                        // Open notifications screen which now handles opening the chat bottom sheet
+                        navController.navigate(Screen.Notifications.route)
                     }
-                    activity.intent.removeExtra("callId")
-                    activity.intent.removeExtra("callerName")
-                    activity.intent.removeExtra("callerImage")
-                    activity.intent.removeExtra("callerId")
+                    "voice_call" -> {
+                        val callId = intent.getStringExtra("callId") ?: ""
+                        val callerName = intent.getStringExtra("callerName") ?: "Partner"
+                        val callerImage = intent.getStringExtra("callerImage")
+                        val callerId = intent.getStringExtra("callerId") ?: ""
+
+                        if (callId.isNotEmpty()) {
+                            callViewModel.handleIncomingCallFromIntent(
+                                callId, callerName, callerImage, bookingId, callerId
+                            )
+                            if (navController.currentDestination?.route != Screen.VoiceCall.route) {
+                                navController.navigate(Screen.VoiceCall.route)
+                            }
+                        }
+                        intent.removeExtra("callId")
+                    }
                 }
+                intent.removeExtra("bookingId")
+                intent.removeExtra("screen")
+            } else if (screen == "notifications") {
+                navController.navigate(Screen.Notifications.route)
+                intent?.removeExtra("screen")
             }
-            // Clear intent to avoid re-navigating on recomposition/config change
-            activity.intent.removeExtra("bookingId")
-            activity.intent.removeExtra("screen")
-        } else if (screen == "notifications") {
-            navController.navigate(Screen.Notifications.route)
-            activity?.intent?.removeExtra("screen")
         }
     }
 
@@ -490,7 +496,10 @@ fun NavGraph(navController: NavHostController) {
         }
 
         composable(Screen.Notifications.route) {
-            NotificationsScreen(onBack = { navController.popBackStack() })
+            NotificationsScreen(
+                onBack = { navController.popBackStack() },
+                onNavigate = { route -> navController.navigate(route) }
+            )
         }
 
         composable(Screen.HelpSupport.route) {
@@ -548,6 +557,14 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.SendMoney.route) {
             SendMoneyScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.InviteEarn.route) {
+            val user = (authState as? AuthState.Authenticated)?.user
+            InviteEarnScreen(
+                user = user,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.VoiceCall.route) {

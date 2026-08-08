@@ -17,7 +17,8 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 data class NotificationData(
     val title: String,
     val message: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val bookingId: String? = null
 )
 
 class PreferenceManager(private val context: Context) {

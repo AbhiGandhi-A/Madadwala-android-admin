@@ -334,6 +334,11 @@ interface ApiService {
         @Body request: Map<String, String>
     ): Response<BookingResponse>
 
+    @POST("api/interactions/init")
+    suspend fun initInteraction(
+        @Body request: Map<String, @JvmSuppressWildcards Any>
+    ): Response<MessageResponse>
+
     @Multipart
     @POST("api/reports")
     suspend fun submitReport(
@@ -594,6 +599,7 @@ data class UserResponse(
     val aadhaarNumber: String? = null,
     val verificationDate: String? = null,
     val profession: String? = null,
+    val pendingReferralDiscount: Double? = 0.0,
     val bankDetails: BankDetailsResponse? = null
 )
 

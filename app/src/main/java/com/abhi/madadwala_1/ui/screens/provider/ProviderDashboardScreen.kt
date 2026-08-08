@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,13 +87,17 @@ fun ProviderDashboardScreen(
 ) {
     val context = LocalContext.current
     val dashboardState by viewModel.dashboardState.collectAsState()
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var subScreen by remember { mutableStateOf<String?>(null) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var subScreen by rememberSaveable { mutableStateOf<String?>(null) }
 
-    BackHandler(enabled = selectedTab != 0) {
-        selectedTab = 0
+    BackHandler(enabled = selectedTab != 0 || subScreen != null) {
+        if (subScreen != null) {
+            subScreen = null
+        } else {
+            selectedTab = 0
+        }
     }
-    var activeChatBookingId by remember { mutableStateOf<String?>(null) }
+    var activeChatBookingId by rememberSaveable { mutableStateOf<String?>(null) }
     val isOnline by viewModel.isOnline.collectAsState()
     
     val address by locationViewModel.address.collectAsState()
@@ -801,7 +806,7 @@ fun ProviderBookingsTab(
     onChat: (String) -> Unit,
     callViewModel: CallViewModel
 ) {
-    var selectedFilter by remember { mutableStateOf("All") }
+    var selectedFilter by rememberSaveable { mutableStateOf("All") }
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
@@ -918,10 +923,10 @@ fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
-    var showWithdrawDialog by remember { mutableStateOf(false) }
+    var showWithdrawDialog by rememberSaveable { mutableStateOf(false) }
     var withdrawAmount by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
-    var isBalanceVisible by remember { mutableStateOf(true) }
+    var isBalanceVisible by rememberSaveable { mutableStateOf(true) }
 
     Column(
         modifier = Modifier
@@ -1134,7 +1139,7 @@ fun ProviderProfileTab(
     onUploadImage: (Uri) -> Unit,
     onRefresh: () -> Unit
 ) {
-    var legalContentType by remember { mutableStateOf<String?>(null) }
+    var legalContentType by rememberSaveable { mutableStateOf<String?>(null) }
     
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1958,7 +1963,7 @@ fun SettingsSubScreen(preferenceManager: PreferenceManager, onBack: () -> Unit) 
     val isNotificationSoundEnabled by preferenceManager.isNotificationSoundEnabled.collectAsState(initial = true)
     val appLanguage by preferenceManager.appLanguage.collectAsState(initial = "en")
     
-    var showLanguagePicker by remember { mutableStateOf(false) }
+    var showLanguagePicker by rememberSaveable { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2045,7 +2050,7 @@ fun ChargesEditor(
     onUpdate: (String, Double) -> Unit,
     onAdd: (String, Double) -> Unit
 ) {
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
     
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2255,8 +2260,8 @@ fun BookingCard(
     callViewModel: CallViewModel
 ) {
     val status = booking.status.uppercase()
-    var showAcceptDialog by remember { mutableStateOf(false) }
-    var showRejectDialog by remember { mutableStateOf(false) }
+    var showAcceptDialog by rememberSaveable { mutableStateOf(false) }
+    var showRejectDialog by rememberSaveable { mutableStateOf(false) }
     var selectedTime by remember { mutableStateOf(booking.scheduledTime) }
     var partnerComment by remember { mutableStateOf("") }
     var rejectReason by remember { mutableStateOf("") }
