@@ -122,8 +122,14 @@ interface ApiService {
     @GET("api/bookings/{id}/messages")
     suspend fun getBookingMessages(@Path("id") id: String): Response<List<BookingMessageResponse>>
 
+    @Multipart
     @POST("api/bookings/messages")
-    suspend fun sendBookingMessage(@Body request: BookingMessageRequest): Response<BookingMessageResponse>
+    suspend fun sendBookingMessage(
+        @Part("bookingId") bookingId: RequestBody,
+        @Part("senderUid") senderUid: RequestBody,
+        @Part("message") message: RequestBody,
+        @Part chatImage: MultipartBody.Part? = null
+    ): Response<BookingMessageResponse>
 
     @GET("api/wallet/transactions/{uid}")
     suspend fun getWalletTransactions(@Path("uid") uid: String): Response<List<TransactionResponse>>
@@ -372,7 +378,8 @@ data class RazorpayOrderResponse(
 data class BookingMessageRequest(
     val bookingId: String,
     val senderUid: String,
-    val message: String
+    val message: String,
+    val imageUrl: String? = null
 )
 
 data class BookingMessageResponse(
@@ -380,6 +387,7 @@ data class BookingMessageResponse(
     val bookingId: String,
     val senderUid: String,
     val message: String,
+    val imageUrl: String? = null,
     val timestamp: String
 )
 

@@ -1,9 +1,11 @@
 package com.abhi.madadwala_1.ui.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.abhi.madadwala_1.data.remote.BookingMessageRequest
 import com.abhi.madadwala_1.data.remote.BookingMessageResponse
+import com.abhi.madadwala_1.data.remote.BookingResponse
 import com.abhi.madadwala_1.data.remote.RetrofitClient
 import com.abhi.madadwala_1.services.SocketHandler
 import com.google.firebase.auth.FirebaseAuth
@@ -11,7 +13,13 @@ import io.socket.client.Socket
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 
 class BookingChatViewModel : ViewModel() {
     private val _messages = MutableStateFlow<List<BookingMessageResponse>>(emptyList())
@@ -20,20 +28,36 @@ class BookingChatViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
+    private val _bookingDetails = MutableStateFlow<BookingResponse?>(null)
+    val bookingDetails: StateFlow<BookingResponse?> = _bookingDetails
+
     private var currentBookingId: String? = null
     private val currentUserUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
     fun initChat(bookingId: String) {
         currentBookingId = bookingId
         fetchMessages(bookingId)
+        fetchBookingDetails(bookingId)
         setupSocket(bookingId)
+    }
+
+    private fun fetchBookingDetails(bookingId: String) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.apiService.getBookingDetails(bookingId)
+                if (response.isSuccessful) {
+                    _bookingDetails.value = response.body()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun fetchMessages(bookingId: String) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Use trackingApiService (Render) for consistency with Socket
                 val response = RetrofitClient.trackingApiService.getBookingMessages(bookingId)
                 if (response.isSuccessful) {
                     _messages.value = response.body() ?: emptyList()
@@ -47,21 +71,13 @@ class BookingChatViewModel : ViewModel() {
     }
 
     private fun setupSocket(bookingId: String) {
-        // Ensure we are using the correct backend for socket
         SocketHandler.setSocket("https://madadwala-backend.onrender.com")
         val socket = SocketHandler.getSocket()
-        
         SocketHandler.establishConnection()
         
-        // Join room immediately.
         socket?.emit("join_booking", bookingId)
         
-        // Listen for connection to re-join room. 
-        // We use a specific listener property to allow removing it later if needed,
-        // or just accept that it might be added multiple times (harmless but not ideal).
-        // For now, let's just make it simple but avoid .off() which breaks other ViewModels.
         socket?.on(Socket.EVENT_CONNECT) {
-            android.util.Log.d("BookingChat", "Socket connected, joining room: $bookingId")
             socket.emit("join_booking", bookingId)
         }
         
@@ -70,14 +86,12 @@ class BookingChatViewModel : ViewModel() {
             if (args.isNotEmpty()) {
                 try {
                     val data = args[0] as? JSONObject ?: return@on
-                    android.util.Log.d("BookingChat", "Received message: $data")
-                    
                     val msgBookingId = data.optString("bookingId")
                     
-                    // Accept if booking ID matches or is empty (for flexibility)
                     if (msgBookingId == currentBookingId || msgBookingId.isEmpty()) {
                         val senderUid = data.optString("senderUid")
                         val message = data.optString("message")
+                        val imageUrl = data.optString("imageUrl").takeIf { it.isNotEmpty() }
                         val timestamp = if (data.has("timestamp")) data.getString("timestamp") else {
                             val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
                             sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
@@ -90,14 +104,12 @@ class BookingChatViewModel : ViewModel() {
                             bookingId = msgBookingId.ifEmpty { currentBookingId ?: "" },
                             senderUid = senderUid,
                             message = message,
+                            imageUrl = imageUrl,
                             timestamp = timestamp
                         )
                         
-                        // Update state flow on main thread
                         viewModelScope.launch {
                             val currentList = _messages.value
-                            
-                            // Check if this message (by ID or content) already exists
                             val existingIndex = currentList.indexOfFirst { 
                                 it._id == msgId || (it._id.startsWith("temp_") && it.message == message && it.senderUid == senderUid)
                             }
@@ -110,25 +122,17 @@ class BookingChatViewModel : ViewModel() {
                                 _messages.value = currentList + newMessage
                             }
                         }
-                    } else {
-                        android.util.Log.d("BookingChat", "Message for different booking: $msgBookingId (Current: $currentBookingId)")
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("BookingChat", "Error parsing message", e)
+                    e.printStackTrace()
                 }
             }
         }
     }
 
-    fun sendMessage(bookingId: String, message: String) {
-        if (message.isBlank()) return
+    fun sendMessage(bookingId: String, message: String, imageUri: Uri? = null, context: Context? = null) {
+        if (message.isBlank() && imageUri == null) return
         
-        val request = BookingMessageRequest(
-            bookingId = bookingId,
-            senderUid = currentUserUid,
-            message = message
-        )
-
         // Optimistic UI update
         val tempId = "temp_${System.currentTimeMillis()}"
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
@@ -140,20 +144,38 @@ class BookingChatViewModel : ViewModel() {
             bookingId = bookingId,
             senderUid = currentUserUid,
             message = message,
+            imageUrl = imageUri?.toString(), // Use local URI temporarily
             timestamp = timestamp
         )
         _messages.value = _messages.value + optimisticMsg
 
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.trackingApiService.sendBookingMessage(request)
+                val bookingIdPart = bookingId.toRequestBody("text/plain".toMediaTypeOrNull())
+                val senderUidPart = currentUserUid.toRequestBody("text/plain".toMediaTypeOrNull())
+                val messagePart = message.toRequestBody("text/plain".toMediaTypeOrNull())
+                
+                var imagePart: MultipartBody.Part? = null
+                if (imageUri != null && context != null) {
+                    val file = getFileFromUri(context, imageUri)
+                    if (file != null) {
+                        val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+                        imagePart = MultipartBody.Part.createFormData("chatImage", file.name, requestFile)
+                    }
+                }
+
+                val response = RetrofitClient.trackingApiService.sendBookingMessage(
+                    bookingIdPart, senderUidPart, messagePart, imagePart
+                )
+
                 if (response.isSuccessful) {
-                    val socket = SocketHandler.getSocket()
                     val serverMsg = response.body()
+                    val socket = SocketHandler.getSocket()
                     val data = JSONObject().apply {
                         put("bookingId", bookingId)
                         put("senderUid", currentUserUid)
                         put("message", message)
+                        put("imageUrl", serverMsg?.imageUrl)
                         put("_id", serverMsg?._id ?: tempId)
                         put("timestamp", serverMsg?.timestamp ?: timestamp)
                     }
@@ -163,6 +185,21 @@ class BookingChatViewModel : ViewModel() {
                 e.printStackTrace()
                 _messages.value = _messages.value.filter { it._id != tempId }
             }
+        }
+    }
+
+    private fun getFileFromUri(context: Context, uri: Uri): File? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val file = File(context.cacheDir, "chat_image_${System.currentTimeMillis()}.jpg")
+            val outputStream = FileOutputStream(file)
+            inputStream?.copyTo(outputStream)
+            inputStream?.close()
+            outputStream.close()
+            file
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 
