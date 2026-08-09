@@ -60,58 +60,94 @@ class WebRTCManager(
     }
 
     fun handleOffer(data: JSONObject) {
-        val fromId = data.getString("from")
-        val sdpString = data.getString("offer")
-        setupPeerConnection(fromId)
-        
-        val sessionDescription = SessionDescription(SessionDescription.Type.OFFER, sdpString)
-        peerConnection?.setRemoteDescription(object : SimpleSdpObserver() {
-            override fun onSetSuccess() {
-                drainIceCandidates()
-                val constraints = MediaConstraints().apply {
-                    mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
-                }
-                peerConnection?.createAnswer(object : SimpleSdpObserver() {
-                    override fun onCreateSuccess(sessionDescription: SessionDescription?) {
-                        sessionDescription?.let { answerSdp ->
-                            peerConnection?.setLocalDescription(object : SimpleSdpObserver() {
-                                override fun onSetSuccess() {
-                                    val answerData = JSONObject().apply {
-                                        put("to", fromId)
-                                        put("answer", answerSdp.description)
-                                        put("type", answerSdp.type.canonicalForm())
-                                    }
-                                    onEmitSignaling("answer", answerData)
-                                }
-                            }, answerSdp)
-                        }
-                    }
-                }, constraints)
+        try {
+            val fromId = data.getString("from")
+            val offerData = data.get("offer")
+            val sdpString = when (offerData) {
+                is JSONObject -> offerData.getString("sdp")
+                is String -> offerData
+                else -> offerData.toString()
             }
-        }, sessionDescription)
+            
+            setupPeerConnection(fromId)
+            
+            val sessionDescription = SessionDescription(SessionDescription.Type.OFFER, sdpString)
+            peerConnection?.setRemoteDescription(object : SimpleSdpObserver() {
+                override fun onSetSuccess() {
+                    drainIceCandidates()
+                    val constraints = MediaConstraints().apply {
+                        mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+                    }
+                    peerConnection?.createAnswer(object : SimpleSdpObserver() {
+                        override fun onCreateSuccess(sessionDescription: SessionDescription?) {
+                            sessionDescription?.let { answerSdp ->
+                                peerConnection?.setLocalDescription(object : SimpleSdpObserver() {
+                                    override fun onSetSuccess() {
+                                        val answerData = JSONObject().apply {
+                                            put("to", fromId)
+                                            put("answer", answerSdp.description)
+                                            put("type", answerSdp.type.canonicalForm())
+                                        }
+                                        onEmitSignaling("answer", answerData)
+                                    }
+                                }, answerSdp)
+                            }
+                        }
+                    }, constraints)
+                }
+            }, sessionDescription)
+        } catch (e: Exception) {
+            Log.e("WebRTC", "Error handling offer", e)
+        }
     }
 
     fun handleAnswer(data: JSONObject) {
-        val sdpString = data.getString("answer")
-        val sessionDescription = SessionDescription(SessionDescription.Type.ANSWER, sdpString)
-        peerConnection?.setRemoteDescription(object : SimpleSdpObserver() {
-            override fun onSetSuccess() {
-                Log.d("WebRTC", "Remote description set (Answer)")
-                drainIceCandidates()
+        try {
+            val answerData = data.get("answer")
+            val sdpString = when (answerData) {
+                is JSONObject -> answerData.getString("sdp")
+                is String -> answerData
+                else -> answerData.toString()
             }
-        }, sessionDescription)
+            
+            val sessionDescription = SessionDescription(SessionDescription.Type.ANSWER, sdpString)
+            peerConnection?.setRemoteDescription(object : SimpleSdpObserver() {
+                override fun onSetSuccess() {
+                    Log.d("WebRTC", "Remote description set (Answer)")
+                    drainIceCandidates()
+                }
+            }, sessionDescription)
+        } catch (e: Exception) {
+            Log.e("WebRTC", "Error handling answer", e)
+        }
     }
 
     fun handleIceCandidate(data: JSONObject) {
-        val candidate = IceCandidate(
-            data.getString("sdpMid"),
-            data.getInt("sdpMLineIndex"),
-            data.getString("candidate")
-        )
-        if (peerConnection != null && peerConnection?.remoteDescription != null) {
-            peerConnection?.addIceCandidate(candidate)
-        } else {
-            pendingIceCandidates.add(candidate)
+        try {
+            // Handle both flat and nested candidate objects
+            val (sdpMid, sdpMLineIndex, sdp) = if (data.has("sdpMid")) {
+                Triple(
+                    data.getString("sdpMid"),
+                    data.getInt("sdpMLineIndex"),
+                    data.getString("candidate")
+                )
+            } else {
+                val cand = data.getJSONObject("candidate")
+                Triple(
+                    cand.getString("sdpMid"),
+                    cand.getInt("sdpMLineIndex"),
+                    cand.getString("candidate")
+                )
+            }
+
+            val candidate = IceCandidate(sdpMid, sdpMLineIndex, sdp)
+            if (peerConnection != null && peerConnection?.remoteDescription != null) {
+                peerConnection?.addIceCandidate(candidate)
+            } else {
+                pendingIceCandidates.add(candidate)
+            }
+        } catch (e: Exception) {
+            Log.e("WebRTC", "Error handling ICE candidate", e)
         }
     }
 

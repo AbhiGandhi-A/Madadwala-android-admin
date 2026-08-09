@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       // Try to get mic, but don't block if not found
       await getMicrophonePermission().catch(() => null);
 
-      setActiveCall({ status: 'dialing', targetName, targetUid, duration: 0 });
+      setActiveCall({ status: 'dialing', targetName, targetUid, duration: 0, isCaller: true });
       const res = await adminApi.startCall({
         bookingId: bookingId,
         customerId: targetUid,
@@ -151,7 +151,12 @@ export default function AdminDashboard() {
 
       pc.onicecandidate = (event) => {
         if (event.candidate && socketRef.current) {
-          socketRef.current.emit('ice_candidate', { to: targetUid, candidate: event.candidate });
+          socketRef.current.emit('ice_candidate', {
+            to: targetUid,
+            candidate: event.candidate.candidate,
+            sdpMid: event.candidate.sdpMid,
+            sdpMLineIndex: event.candidate.sdpMLineIndex
+          });
         }
       };
 
@@ -165,14 +170,15 @@ export default function AdminDashboard() {
       };
 
       if (isIncoming && offerData) {
-        await pc.setRemoteDescription(new RTCSessionDescription(offerData));
+        const sdp = typeof offerData === 'string' ? offerData : offerData.sdp;
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: sdp }));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        socketRef.current.emit('answer', { to: targetUid, answer });
+        socketRef.current.emit('answer', { to: targetUid, answer: answer.sdp, type: 'answer' });
       } else if (!isIncoming) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        socketRef.current.emit('offer', { to: targetUid, offer });
+        socketRef.current.emit('offer', { to: targetUid, offer: offer.sdp, type: 'offer' });
       }
 
     } catch (err) {
@@ -256,7 +262,8 @@ export default function AdminDashboard() {
         targetName: data.callerName,
         targetUid: data.callerId,
         callId: data.callId,
-        duration: 0
+        duration: 0,
+        isCaller: false
       });
       playSiren(); // Reuse siren as ringtone
     });
@@ -285,14 +292,22 @@ export default function AdminDashboard() {
 
     socket.on('answer', async (data) => {
       if (pcRef.current) {
-        await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+        const sdp = typeof data.answer === 'string' ? data.answer : data.answer.sdp;
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: sdp }));
       }
     });
 
     socket.on('ice_candidate', async (data) => {
       if (pcRef.current) {
         try {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+          const candidateInit = (data.candidate && typeof data.candidate === 'object')
+            ? data.candidate
+            : {
+                candidate: data.candidate,
+                sdpMid: data.sdpMid,
+                sdpMLineIndex: data.sdpMLineIndex
+              };
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(candidateInit));
         } catch (e) { console.error("ICE error", e); }
       }
     });
@@ -304,13 +319,12 @@ export default function AdminDashboard() {
 
   // Call Negotiation Trigger
   useEffect(() => {
-    if (activeCall?.status === 'connected' && activeCall?.targetUid && !pcRef.current) {
+    if (activeCall?.status === 'connected' && activeCall?.targetUid && !pcRef.current && activeCall?.isCaller) {
         // Only initiate offer if we are the caller (dialing/ringing states preceded connected)
         // If we are the receiver, we wait for the offer.
-        // For simplicity, let's always try to start WebRTC if not started.
         startWebRTC(activeCall.targetUid, false);
     }
-  }, [activeCall?.status, activeCall?.targetUid]);
+  }, [activeCall?.status, activeCall?.targetUid, activeCall?.isCaller]);
 
   // Call Duration Timer
   useEffect(() => {
