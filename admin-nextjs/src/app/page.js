@@ -569,7 +569,7 @@ export default function AdminDashboard() {
                         lat: sosAlert.bookingDetails.providerLat,
                         lng: sosAlert.bookingDetails.providerLng,
                         status: 'busy',
-                        profileImage: sosAlert.bookingDetails.providerImage
+                        profileImage: sosAlert.bookingDetails.providerImage || sosAlert.bookingDetails.profileImage
                     }] : []}
                     distressedUser={sosAlert.location}
                     sosProviderUid={sosAlert.bookingDetails?.providerUid}
@@ -613,8 +613,8 @@ export default function AdminDashboard() {
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Assigned Partner</p>
                             <div className="flex items-center gap-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
                                 <div className="w-10 h-10 bg-indigo-100 rounded-full overflow-hidden shrink-0 border-2 border-white flex items-center justify-center bg-gray-200">
-                                    {sosAlert.bookingDetails.providerImage ? (
-                                        <img src={sosAlert.bookingDetails.providerImage} className="w-full h-full object-cover" />
+                                    {(sosAlert.bookingDetails.providerImage || sosAlert.bookingDetails.profileImage) ? (
+                                        <img src={sosAlert.bookingDetails.providerImage || sosAlert.bookingDetails.profileImage} className="w-full h-full object-cover" />
                                     ) : (
                                         <Users size={16} className="text-gray-400" />
                                     )}
