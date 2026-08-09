@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.abhi.madadwala_1.data.remote.BookingMessageResponse
 import com.abhi.madadwala_1.data.remote.BookingResponse
+import com.abhi.madadwala_1.data.remote.ProviderResponse
 import com.abhi.madadwala_1.data.remote.RetrofitClient
 import com.abhi.madadwala_1.services.SocketHandler
 import com.google.firebase.auth.FirebaseAuth
@@ -31,6 +32,9 @@ class BookingChatViewModel : ViewModel() {
     private val _bookingDetails = MutableStateFlow<BookingResponse?>(null)
     val bookingDetails: StateFlow<BookingResponse?> = _bookingDetails
 
+    private val _partnerProfile = MutableStateFlow<ProviderResponse?>(null)
+    val partnerProfile: StateFlow<ProviderResponse?> = _partnerProfile
+
     private var currentBookingId: String? = null
     private val currentUserUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
@@ -46,7 +50,26 @@ class BookingChatViewModel : ViewModel() {
             try {
                 val response = RetrofitClient.apiService.getBookingDetails(bookingId)
                 if (response.isSuccessful) {
-                    _bookingDetails.value = response.body()
+                    val booking = response.body()
+                    _bookingDetails.value = booking
+                    
+                    // Fetch partner profile for online status
+                    booking?.providerUid?.let { uid ->
+                        fetchPartnerProfile(uid)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun fetchPartnerProfile(uid: String) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.apiService.getProviderDetails(uid)
+                if (response.isSuccessful) {
+                    _partnerProfile.value = response.body()?.provider
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

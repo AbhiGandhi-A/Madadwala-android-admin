@@ -197,7 +197,9 @@ fun NotificationsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit = {}) {
     if (activeChatBookingId != null) {
         com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
             bookingId = activeChatBookingId!!,
-            onDismiss = { activeChatBookingId = null }
+            onDismiss = { activeChatBookingId = null },
+            onViewBookingDetails = { id -> onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.LiveTracking.createRoute(id)) },
+            onViewPartnerProfile = { uid -> onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.ProviderProfile.createRoute(uid)) }
         )
     }
 }

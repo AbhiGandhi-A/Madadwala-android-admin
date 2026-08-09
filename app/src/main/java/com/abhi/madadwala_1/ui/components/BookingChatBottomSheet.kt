@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,15 +24,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.abhi.madadwala_1.data.remote.BookingMessageResponse
 import com.abhi.madadwala_1.data.remote.BookingResponse
+import com.abhi.madadwala_1.data.remote.ProviderResponse
 import com.abhi.madadwala_1.ui.theme.MadadwalaColors
 import com.abhi.madadwala_1.ui.viewmodel.BookingChatViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -42,12 +44,15 @@ import java.util.*
 fun BookingChatBottomSheet(
     bookingId: String,
     onDismiss: () -> Unit,
+    onViewBookingDetails: (String) -> Unit = {},
+    onViewPartnerProfile: (String) -> Unit = {},
     chatViewModel: BookingChatViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val messages by chatViewModel.messages.collectAsState()
     val isLoading by chatViewModel.isLoading.collectAsState()
     val bookingDetails by chatViewModel.bookingDetails.collectAsState()
+    val partnerProfile by chatViewModel.partnerProfile.collectAsState()
     val currentUserUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     var messageText by remember { mutableStateOf("") }
     val scrollState = rememberLazyListState()
@@ -80,6 +85,7 @@ fun BookingChatBottomSheet(
             topBar = {
                 ChatTopBar(
                     bookingDetails = bookingDetails,
+                    partnerProfile = partnerProfile,
                     onBack = onDismiss
                 )
             },
@@ -104,7 +110,11 @@ fun BookingChatBottomSheet(
                     .padding(padding)
             ) {
                 bookingDetails?.let {
-                    BookingInfoCard(it)
+                    BookingInfoCard(
+                        booking = it,
+                        onViewDetails = { onViewBookingDetails(it._id) },
+                        onViewProfile = { it.providerUid.let { uid -> onViewPartnerProfile(uid) } }
+                    )
                 }
 
                 Box(modifier = Modifier.weight(1f)) {
@@ -127,7 +137,7 @@ fun BookingChatBottomSheet(
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text("No messages yet", color = Color.Gray, fontWeight = FontWeight.Medium)
-                            Text("Start a conversation with the partner", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
+                            Text("Start a conversation", style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
                         }
                     } else {
                         val groupedMessages = groupMessagesByDate(messages)
@@ -144,7 +154,7 @@ fun BookingChatBottomSheet(
                                 }
                                 items(msgs) { msg ->
                                     val isMe = msg.senderUid == currentUserUid
-                                    ChatBubble(msg, isMe)
+                                    ChatBubble(msg, isMe, bookingDetails)
                                 }
                             }
                         }
@@ -158,6 +168,7 @@ fun BookingChatBottomSheet(
 @Composable
 fun ChatTopBar(
     bookingDetails: BookingResponse?,
+    partnerProfile: ProviderResponse?,
     onBack: () -> Unit
 ) {
     Surface(
@@ -189,27 +200,29 @@ fun ChatTopBar(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = bookingDetails?.providerName ?: "Abhi - Prov",
+                        text = bookingDetails?.providerName ?: "Partner",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = "Verified",
-                        tint = Color(0xFF4CAF50),
-                        modifier = Modifier.size(16.dp)
-                    )
+                    if (partnerProfile?.isVerified == true || bookingDetails?.providerName != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Verified",
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
                 Text(
-                    text = "Online",
+                    text = if (partnerProfile?.isAvailable == true) "Online" else "Offline",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.Gray
+                    color = if (partnerProfile?.isAvailable == true) Color(0xFF4CAF50) else Color.Gray
                 )
             }
             
-            IconButton(onClick = { /* Call logic */ }) {
+            IconButton(onClick = { /* Call logic handled by caller */ }) {
                 Icon(Icons.Default.Call, contentDescription = "Call", tint = MadadwalaColors.Green)
             }
             IconButton(onClick = { /* Menu logic */ }) {
@@ -220,7 +233,11 @@ fun ChatTopBar(
 }
 
 @Composable
-fun BookingInfoCard(booking: BookingResponse) {
+fun BookingInfoCard(
+    booking: BookingResponse,
+    onViewDetails: () -> Unit,
+    onViewProfile: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,7 +285,7 @@ fun BookingInfoCard(booking: BookingResponse) {
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Text(
-                        text = booking.status.uppercase(),
+                        text = booking.status.replace("_", " ").uppercase(),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -279,23 +296,26 @@ fun BookingInfoCard(booking: BookingResponse) {
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF0F0F0))
             
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 TextButton(
-                    onClick = { /* View details */ },
+                    onClick = onViewDetails,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Assignment, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Assignment, contentDescription = null, modifier = Modifier.size(18.dp), tint = MadadwalaColors.Green)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("View Booking Details", fontSize = 12.sp, color = Color.Black)
+                    Text("View Booking Details", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.SemiBold)
                 }
-                Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color(0xFFF0F0F0)).align(Alignment.CenterVertically))
+                Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color(0xFFEEEEEE)))
                 TextButton(
-                    onClick = { /* View profile */ },
+                    onClick = onViewProfile,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(18.dp), tint = MadadwalaColors.Green)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("View Partner Profile", fontSize = 12.sp, color = Color.Black)
+                    Text("View Partner Profile", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -303,7 +323,7 @@ fun BookingInfoCard(booking: BookingResponse) {
 }
 
 @Composable
-fun ChatBubble(msg: BookingMessageResponse, isMe: Boolean) {
+fun ChatBubble(msg: BookingMessageResponse, isMe: Boolean, bookingDetails: BookingResponse?) {
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     val timeString = try {
         val date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
@@ -321,7 +341,7 @@ fun ChatBubble(msg: BookingMessageResponse, isMe: Boolean) {
     ) {
         if (!isMe) {
             AsyncImage(
-                model = "https://via.placeholder.com/150", // Should be sender profile pic
+                model = bookingDetails?.providerImage ?: "https://via.placeholder.com/150",
                 contentDescription = null,
                 modifier = Modifier
                     .size(32.dp)
@@ -351,17 +371,19 @@ fun ChatBubble(msg: BookingMessageResponse, isMe: Boolean) {
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp)
+                                .heightIn(max = 300.dp)
                                 .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Fit
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
-                    Text(
-                        text = msg.message,
-                        color = if (isMe) Color.White else Color.Black,
-                        fontSize = 14.sp
-                    )
+                    if (msg.message.isNotEmpty()) {
+                        Text(
+                            text = msg.message,
+                            color = if (isMe) Color.White else Color.Black,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
             

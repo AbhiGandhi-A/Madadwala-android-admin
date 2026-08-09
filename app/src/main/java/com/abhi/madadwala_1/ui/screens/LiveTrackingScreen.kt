@@ -564,7 +564,9 @@ fun LiveTrackingScreen(
     if (showChatSheet) {
         com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
             bookingId = bookingId,
-            onDismiss = { showChatSheet = false }
+            onDismiss = { showChatSheet = false },
+            onViewBookingDetails = { /* Already on tracking screen */ },
+            onViewPartnerProfile = { uid -> /* navigation needed here but Screen is not imported? */ }
         )
     }
 }
