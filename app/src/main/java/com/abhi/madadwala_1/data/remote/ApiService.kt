@@ -354,6 +354,9 @@ interface ApiService {
         @Part("description") description: RequestBody,
         @Part evidence: List<MultipartBody.Part>?
     ): Response<MessageResponse>
+
+    @POST("api/sos")
+    suspend fun sendSOS(@Body request: Map<String, @JvmSuppressWildcards Any>): Response<MessageResponse>
 }
 
 data class CallRequest(

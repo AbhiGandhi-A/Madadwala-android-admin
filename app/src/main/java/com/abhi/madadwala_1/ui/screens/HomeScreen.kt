@@ -481,7 +481,16 @@ fun HomeScreen(
                     )
                     1 -> BookingsTabContent(user?.uid ?: "", onNavigate, callViewModel, onChat = { activeChatBookingId = it })
                     2 -> WalletTabContent(user, onNavigate)
-                    3 -> ProfileTabContent(userName, user?.phoneNumber ?: "", user?.profileImage, onLogout, onNavigate)
+                    3 -> ProfileTabContent(
+                        name = userName,
+                        phone = user?.phoneNumber ?: "",
+                        profileImage = user?.profileImage,
+                        uid = user?.uid ?: "",
+                        userLat = userLat,
+                        userLng = userLng,
+                        onLogout = onLogout,
+                        onNavigate = onNavigate
+                    )
                 }
             }
 
@@ -3066,11 +3075,16 @@ fun ProfileTabContent(
     name: String,
     phone: String,
     profileImage: String?,
+    uid: String,
+    userLat: Double,
+    userLng: Double,
     onLogout: () -> Unit,
     onNavigate: (String) -> Unit
 ) {
     var showEditProfile by rememberSaveable { mutableStateOf(false) }
     var showSavedAddresses by rememberSaveable { mutableStateOf(false) }
+    var showSosConfirmation by rememberSaveable { mutableStateOf(false) }
+    var isSendingSos by remember { mutableStateOf(false) }
     var legalContentType by rememberSaveable { mutableStateOf<String?>(null) }
     var currentName by remember { mutableStateOf(name) }
     var offersCount by remember { mutableIntStateOf(0) }
@@ -3325,6 +3339,52 @@ fun ProfileTabContent(
             }
         }
 
+        // Emergency SOS Button
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clickable { showSosConfirmation = true },
+                shape = RoundedCornerShape(12.dp),
+                color = MadadwalaColors.Red.copy(alpha = 0.05f),
+                border = BorderStroke(1.dp, MadadwalaColors.Red.copy(alpha = 0.2f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(40.dp).background(MadadwalaColors.Red, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Emergency SOS",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                color = MadadwalaColors.Red
+                            )
+                        )
+                        Text(
+                            "Instant alert to Madadwala Support",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MadadwalaColors.Red.copy(0.7f)
+                        )
+                    }
+                    if (isSendingSos) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MadadwalaColors.Red, strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MadadwalaColors.Red.copy(0.5f))
+                    }
+                }
+            }
+        }
+
         // Sections
         item {
             ProfileSection("Account Settings") {
@@ -3432,6 +3492,58 @@ fun ProfileTabContent(
 
     if (showSavedAddresses) {
         SavedAddressesDialog(uid = user?.uid ?: "", onDismiss = { showSavedAddresses = false })
+    }
+
+    if (showSosConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showSosConfirmation = false },
+            containerColor = Color.White,
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MadadwalaColors.Red, modifier = Modifier.size(48.dp)) },
+            title = { Text("Emergency SOS", fontWeight = FontWeight.Black, color = MadadwalaColors.Red) },
+            text = {
+                Text(
+                    "Are you in an emergency? This will send your current location and details to Madadwala Support team immediately.",
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSosConfirmation = false
+                        isSendingSos = true
+                        scope.launch {
+                            try {
+                                val sosData = mapOf(
+                                    "uid" to uid,
+                                    "name" to name,
+                                    "phoneNumber" to phone,
+                                    "location" to mapOf("lat" to userLat, "lng" to userLng)
+                                )
+                                val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.sendSOS(sosData)
+                                if (res.isSuccessful) {
+                                    Toast.makeText(context, "Emergency alert sent successfully!", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Failed to send alert. Please call support.", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Connection error. Please call support.", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                isSendingSos = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Red),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("YES, SEND ALERT", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSosConfirmation = false }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        )
     }
 
     if (legalContentType != null) {

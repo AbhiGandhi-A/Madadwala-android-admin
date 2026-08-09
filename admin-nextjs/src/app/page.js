@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import dynamic from 'next/dynamic';
+import { io } from 'socket.io-client';
+
+const MapComponent = dynamic(() => import('@/components/MapComponent'), {
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), {
   ssr: false,
@@ -51,6 +54,37 @@ export default function AdminDashboard() {
   });
   const [toast, setToast] = useState(null);
   const [selectedPartner, setSelectedPartner] = useState(null);
+  const [sosAlert, setSosAlert] = useState(null);
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    // Socket initialization for SOS alerts
+    const socket = io('https://madadwala-backend.onrender.com'); // Match backend URL
+
+    socket.on('emergency_sos', (data) => {
+      console.log('EMERGENCY SOS RECEIVED:', data);
+      setSosAlert(data);
+      playSiren();
+    });
+
+    return () => socket.disconnect();
+  }, []);
+
+  const playSiren = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
+      audioRef.current.loop = true;
+    }
+    audioRef.current.play().catch(e => console.log("Audio play failed:", e));
+  };
+
+  const stopSiren = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setSosAlert(null);
+  };
 
   useEffect(() => { fetchTabData(activeTab); }, [activeTab]);
   useEffect(() => {
@@ -470,6 +504,66 @@ export default function AdminDashboard() {
               <button onClick={handleAction} className={`w-full py-3 rounded-xl font-semibold text-[13px] shadow-sm transition-colors active:scale-[0.98] ${activeModal === 'delete' ? 'bg-red-600 hover:bg-red-700 text-white' : activeModal === 'kyc-viewer' || activeModal === 'booking-detail' || activeModal === 'details' ? 'hidden' : 'bg-gray-900 hover:bg-gray-800 text-white'}`}>
                 {activeModal === 'delete' ? 'Delete account' : activeModal === 'broadcast' ? 'Send broadcast' : activeModal === 'reject-kyc' ? 'Reject application' : 'Save'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Emergency SOS Modal */}
+      {sosAlert && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-red-600/20 backdrop-blur-sm animate-pulse"></div>
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-red-600 animate-in zoom-in duration-300">
+            <div className="bg-red-600 p-8 text-white text-center">
+              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <ShieldAlert size={48} strokeWidth={2.5} />
+              </div>
+              <h2 className="text-3xl font-black uppercase tracking-tighter mb-1">Emergency SOS</h2>
+              <p className="text-red-100 font-medium">An emergency alert has been triggered!</p>
+            </div>
+
+            <div className="p-8 space-y-6">
+              <div className="flex items-center gap-4 p-4 bg-red-50 rounded-2xl border border-red-100">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 shrink-0">
+                  <Users size={24} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-red-400 uppercase tracking-wider">User Details</p>
+                  <p className="text-lg font-bold text-gray-900">{sosAlert.name}</p>
+                  <p className="text-sm font-semibold text-gray-500">{sosAlert.phoneNumber}</p>
+                </div>
+              </div>
+
+              {sosAlert.location && (
+                <div className="space-y-3">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1">Last Known Location</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => window.open(`https://www.google.com/maps?q=${sosAlert.location.lat},${sosAlert.location.lng}`)}
+                      className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-black transition-colors"
+                    >
+                      <MapPin size={20} /> Open in Google Maps
+                    </button>
+                  </div>
+                  <p className="text-center text-[11px] text-gray-400 font-mono">
+                    Lat: {sosAlert.location.lat.toFixed(6)}, Lng: {sosAlert.location.lng.toFixed(6)}
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-4 flex flex-col gap-3">
+                <a
+                  href={`tel:${sosAlert.phoneNumber}`}
+                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-center flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-lg shadow-emerald-200"
+                >
+                  <Phone size={20} /> CALL USER NOW
+                </a>
+                <button
+                  onClick={stopSiren}
+                  className="w-full py-3 text-gray-400 font-bold hover:text-gray-600 transition-colors"
+                >
+                  Dismiss & Stop Siren
+                </button>
+              </div>
             </div>
           </div>
         </div>
