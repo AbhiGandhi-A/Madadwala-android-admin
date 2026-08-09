@@ -90,7 +90,10 @@ export default function AdminDashboard() {
       return stream;
     } catch (err) {
       console.error("Mic Error:", err);
-      showToast("Microphone access denied. Please enable it in browser settings.", "error");
+      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        showToast("No microphone detected. You can hear them, but they won't hear you.", "warning");
+        return null;
+      }
       throw err;
     }
   };
@@ -98,8 +101,8 @@ export default function AdminDashboard() {
   const initiateCall = async (targetUid, targetName = 'User', bookingId = 'admin_call') => {
     try {
       cleanupWebRTC();
-      // Request permission immediately on user gesture
-      const stream = await getMicrophonePermission();
+      // Try to get mic, but don't block if not found
+      await getMicrophonePermission().catch(() => null);
 
       setActiveCall({ status: 'dialing', targetName, targetUid, duration: 0 });
       const res = await adminApi.startCall({
@@ -123,7 +126,7 @@ export default function AdminDashboard() {
   const acceptIncomingCall = async () => {
     if (!activeCall?.callId) return;
     try {
-        const stream = await getMicrophonePermission();
+        await getMicrophonePermission().catch(() => null);
         socketRef.current.emit('call_accepted', { callId: activeCall.callId });
         setActiveCall(prev => ({ ...prev, status: 'connected' }));
     } catch (e) {
@@ -131,15 +134,20 @@ export default function AdminDashboard() {
     }
   };
 
-  const startWebRTC = async (targetUid, isIncoming = false) => {
+  const startWebRTC = async (targetUid, isIncoming = false, offerData = null) => {
     try {
-      console.log("Starting WebRTC negotiation. Incoming:", isIncoming);
-      const stream = localStreamRef.current || await getMicrophonePermission();
+      if (pcRef.current) return;
+      console.log("Starting WebRTC. Incoming:", isIncoming);
 
       const pc = new RTCPeerConnection(rtcConfig);
       pcRef.current = pc;
 
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      const stream = localStreamRef.current;
+      if (stream) {
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      } else {
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+      }
 
       pc.onicecandidate = (event) => {
         if (event.candidate && socketRef.current) {
@@ -151,11 +159,17 @@ export default function AdminDashboard() {
         console.log("Remote audio track received");
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
-          remoteAudioRef.current.play().catch(e => console.error("Autoplay blocked:", e));
+          remoteAudioRef.current.muted = false;
+          remoteAudioRef.current.play().catch(e => console.error("Autoplay failed:", e));
         }
       };
 
-      if (!isIncoming) {
+      if (isIncoming && offerData) {
+        await pc.setRemoteDescription(new RTCSessionDescription(offerData));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socketRef.current.emit('answer', { to: targetUid, answer });
+      } else if (!isIncoming) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         socketRef.current.emit('offer', { to: targetUid, offer });
@@ -266,36 +280,7 @@ export default function AdminDashboard() {
     // WebRTC Signaling
     socket.on('offer', async (data) => {
       console.log("RTC Offer received:", data);
-      if (pcRef.current) {
-        await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pcRef.current.createAnswer();
-        await pcRef.current.setLocalDescription(answer);
-        socketRef.current.emit('answer', { to: data.from, answer });
-      } else {
-        // If PC not ready, we might need to initialize it
-        // This happens if Admin is the receiver
-        const stream = localStreamRef.current || await getMicrophonePermission();
-        const pc = new RTCPeerConnection(rtcConfig);
-        pcRef.current = pc;
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-        pc.onicecandidate = (event) => {
-            if (event.candidate && socketRef.current) {
-              socketRef.current.emit('ice_candidate', { to: data.from, candidate: event.candidate });
-            }
-        };
-        pc.ontrack = (event) => {
-            if (remoteAudioRef.current) {
-              remoteAudioRef.current.srcObject = event.streams[0];
-              remoteAudioRef.current.play().catch(e => console.error("Autoplay blocked:", e));
-            }
-        };
-
-        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socketRef.current.emit('answer', { to: data.from, answer });
-      }
+      startWebRTC(data.from, true, data.offer);
     });
 
     socket.on('answer', async (data) => {
