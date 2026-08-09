@@ -7,7 +7,7 @@ import {
   UserCheck, UserMinus, Clock, Filter, FileText, AlertTriangle,
   Trash2, Plus, Star, Wallet, Send, X, MoreVertical, Eye, Check,
   Activity, Zap, MapPin, Navigation, Info, RefreshCw, Maximize2, Phone, ExternalLink,
-  Percent, Description, PrivacyTip, History, Heart, Ban, Wallet2, Download
+  Percent, Description, PrivacyTip, History, Heart, Ban, Wallet2, Download, MicOff
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import dynamic from 'next/dynamic';
