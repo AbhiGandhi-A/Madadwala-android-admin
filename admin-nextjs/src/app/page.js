@@ -7,7 +7,7 @@ import {
   UserCheck, UserMinus, Clock, Filter, FileText, AlertTriangle,
   Trash2, Plus, Star, Wallet, Send, X, MoreVertical, Eye, Check,
   Activity, Zap, MapPin, Navigation, Info, RefreshCw, Maximize2, Phone, ExternalLink,
-  Percent, Description, PrivacyTip, History, Heart, Ban, Wallet2, Download, MicOff
+  Percent, Description, PrivacyTip, History, Heart, Ban, Wallet2, Download, MicOff, Mic
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import dynamic from 'next/dynamic';
@@ -56,11 +56,32 @@ export default function AdminDashboard() {
   const [sosProviderUid, setSosProviderUid] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
   const [activeCall, setActiveCall] = useState(null); // { status: 'dialing'|'ringing'|'connected'|'ended', targetName, targetUid, callId, duration: 0 }
+  const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef(null);
   const socketRef = useRef(null);
+  const pcRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+
+  const rtcConfig = {
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  };
+
+  const cleanupWebRTC = () => {
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    setIsMuted(false);
+  };
 
   const initiateCall = async (targetUid, targetName = 'User', bookingId = 'admin_call') => {
     try {
+      cleanupWebRTC(); // Ensure clean state
       setActiveCall({ status: 'dialing', targetName, targetUid, duration: 0 });
       const res = await adminApi.startCall({
         bookingId: bookingId,
@@ -80,10 +101,56 @@ export default function AdminDashboard() {
     }
   };
 
+  const startWebRTC = async (targetUid) => {
+    try {
+      console.log("Starting WebRTC for:", targetUid);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = stream;
+
+      const pc = new RTCPeerConnection(rtcConfig);
+      pcRef.current = pc;
+
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && socketRef.current) {
+          socketRef.current.emit('ice_candidate', { to: targetUid, candidate: event.candidate });
+        }
+      };
+
+      pc.ontrack = (event) => {
+        console.log("Remote track received");
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+          remoteAudioRef.current.play().catch(e => console.error("Audio play failed:", e));
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socketRef.current.emit('offer', { to: targetUid, offer });
+
+    } catch (err) {
+      console.error("WebRTC Error:", err);
+      showToast("Microphone access denied or error occurred.", "error");
+    }
+  };
+
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
   const endActiveCall = () => {
     if (activeCall?.callId && socketRef.current) {
       socketRef.current.emit('end_call', { callId: activeCall.callId });
     }
+    cleanupWebRTC();
     setActiveCall(prev => prev ? { ...prev, status: 'ended' } : null);
     setTimeout(() => setActiveCall(null), 2000);
   };
@@ -147,14 +214,41 @@ export default function AdminDashboard() {
     });
 
     socket.on('call_ended', (data) => {
+      cleanupWebRTC();
       setActiveCall(prev => (prev && prev.callId === data.callId) ? { ...prev, status: 'ended' } : prev);
       setTimeout(() => setActiveCall(null), 2000);
+    });
+
+    // WebRTC Signaling
+    socket.on('offer', async (data) => {
+      console.log("RTC Offer received:", data);
+    });
+
+    socket.on('answer', async (data) => {
+      if (pcRef.current) {
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+    });
+
+    socket.on('ice_candidate', async (data) => {
+      if (pcRef.current) {
+        try {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (e) { console.error("ICE error", e); }
+      }
     });
 
     return () => {
       socket.disconnect();
     };
   }, []);
+
+  // Call Negotiation Trigger
+  useEffect(() => {
+    if (activeCall?.status === 'connected' && activeCall?.targetUid && !pcRef.current) {
+        startWebRTC(activeCall.targetUid);
+    }
+  }, [activeCall?.status, activeCall?.targetUid]);
 
   // Call Duration Timer
   useEffect(() => {
@@ -754,9 +848,10 @@ export default function AdminDashboard() {
             </div>
 
             <div className="p-6 bg-white flex flex-col gap-4">
+                <audio ref={remoteAudioRef} autoPlay />
                 <div className="flex justify-center gap-8">
-                    <button className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
-                        <MicOff size={20} />
+                    <button onClick={toggleMute} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isMuted ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}>
+                        {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
                     </button>
                     <button className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
                         <Maximize2 size={20} />
