@@ -78,6 +78,7 @@ export default function AdminDashboard() {
       console.log('🚨 EMERGENCY SOS RECEIVED:', data);
 
       if (data.bookingId) {
+        socket.emit('join_booking', data.bookingId); // Join booking room for live updates
         try {
           const res = await adminApi.getBookingDetails(data.bookingId);
           data.bookingDetails = res.data;
@@ -89,6 +90,18 @@ export default function AdminDashboard() {
 
       setSosAlert(data);
       playSiren();
+    });
+
+    socket.on('location_update', (update) => {
+      setSosAlert(current => {
+        if (!current || !current.bookingDetails || current.bookingId !== update.bookingId) return current;
+        const newDetails = { ...current.bookingDetails };
+        if (update.role === 'provider') {
+            newDetails.providerLat = update.lat;
+            newDetails.providerLng = update.lng;
+        }
+        return { ...current, bookingDetails: newDetails };
+      });
     });
 
     return () => {

@@ -62,16 +62,24 @@ const createEliteMarker = (status, imageUrl, isSOS = false, name = '') => {
   });
 };
 
-const MapController = ({ target }) => {
+const MapController = ({ target, distressedUser }) => {
   const map = useMap();
-  useEffect(() => {
-    if (target?.lat && target?.lng) {
-      map.flyTo([target.lat, target.lng], 16, { animate: true, duration: 1.5 });
-    }
-  }, [target, map]);
 
   useEffect(() => {
-    // Initial size fix for Leaflet in Next.js
+    if (target?.lat && target?.lng && distressedUser?.lat && distressedUser?.lng) {
+      const bounds = L.latLngBounds(
+        [target.lat, target.lng],
+        [distressedUser.lat, distressedUser.lng]
+      );
+      map.fitBounds(bounds, { padding: [50, 50], animate: true });
+    } else if (target?.lat && target?.lng) {
+      map.flyTo([target.lat, target.lng], 16, { animate: true });
+    } else if (distressedUser?.lat && distressedUser?.lng) {
+      map.flyTo([distressedUser.lat, distressedUser.lng], 16, { animate: true });
+    }
+  }, [target, distressedUser, map]);
+
+  useEffect(() => {
     setTimeout(() => { map.invalidateSize(); }, 500);
   }, [map]);
 
@@ -99,13 +107,43 @@ export default function MapComponent({ partners = [], selectedPartner, sosProvid
             <Marker
                 position={[distressedUser.lat, distressedUser.lng]}
                 icon={new L.DivIcon({
-                    html: `<div class="sos-blink" style="width: 20px; height: 20px; background: #ef4444; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 15px #ef4444;"></div>`,
+                    html: `
+                      <div class="elite-marker-wrapper" style="position: relative; width: 50px; height: 50px;">
+                        <div style="
+                          width: 48px;
+                          height: 48px;
+                          border-radius: 50%;
+                          border: 4px solid #ef4444;
+                          box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+                          overflow: hidden;
+                          background: white;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        ">
+                          <div style="font-weight:900;color:#ef4444;font-size:18px;">YOU</div>
+                        </div>
+                        <div style="
+                          position: absolute;
+                          top: 100%;
+                          left: 50%;
+                          transform: translateX(-50%);
+                          width: 0;
+                          height: 0;
+                          border-left: 10px solid transparent;
+                          border-right: 10px solid transparent;
+                          border-top: 12px solid #ef4444;
+                          margin-top: -6px;
+                        "></div>
+                      </div>
+                    `,
                     className: 'custom-leaflet-marker',
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10],
+                    iconSize: [50, 60],
+                    iconAnchor: [25, 60],
                 })}
+                zIndexOffset={3000}
             >
-                <Popup offset={[0, -10]}>
+                <Popup offset={[0, -50]}>
                     <div className="text-center font-bold text-red-600 text-[10px]">USER LOCATION</div>
                 </Popup>
             </Marker>
@@ -125,14 +163,17 @@ export default function MapComponent({ partners = [], selectedPartner, sosProvid
               <Popup offset={[0, -50]}>
                 <div className="text-center font-sans">
                   <p className="font-bold text-slate-800 uppercase text-[10px]">{p.name}</p>
-                  <p className="text-[9px] text-indigo-500 font-bold uppercase">{isSOS ? '🚨 EMERGENCY' : p.status}</p>
+                  <p className="text-[9px] text-indigo-500 font-bold uppercase">{isSOS ? '🚨 PARTNER' : p.status}</p>
                 </div>
               </Popup>
             </Marker>
           );
         })}
 
-        <MapController target={selectedPartner || (distressedUser ? { lat: distressedUser.lat, lng: distressedUser.lng } : null)} />
+        <MapController
+            target={selectedPartner || (sosProviderUid ? partners.find(p => p.uid === sosProviderUid) : null)}
+            distressedUser={distressedUser}
+        />
       </MapContainer>
 
       {/* CSS fix for marker rendering */}
