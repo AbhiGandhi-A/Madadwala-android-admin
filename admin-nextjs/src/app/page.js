@@ -14,8 +14,6 @@ import dynamic from 'next/dynamic';
 import { io } from 'socket.io-client';
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), {
-
-const MapComponent = dynamic(() => import('@/components/MapComponent'), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-gray-50 flex items-center justify-center text-sm font-medium text-gray-400">Loading map…</div>
 });
