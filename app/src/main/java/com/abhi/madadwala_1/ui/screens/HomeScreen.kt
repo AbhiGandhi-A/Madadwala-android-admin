@@ -481,16 +481,21 @@ fun HomeScreen(
                     )
                     1 -> BookingsTabContent(user?.uid ?: "", onNavigate, callViewModel, onChat = { activeChatBookingId = it })
                     2 -> WalletTabContent(user, onNavigate)
-                    3 -> ProfileTabContent(
-                        name = userName,
-                        phone = user?.phoneNumber ?: "",
-                        profileImage = user?.profileImage,
-                        uid = user?.uid ?: "",
-                        userLat = userLat,
-                        userLng = userLng,
-                        onLogout = onLogout,
-                        onNavigate = onNavigate
-                    )
+                    3 -> {
+                        val activeBooking = recentBookings.find { it.status in listOf("accepted", "on_the_way", "arrived", "in_progress") }
+                        ProfileTabContent(
+                            name = userName,
+                            phone = user?.phoneNumber ?: "",
+                            profileImage = user?.profileImage,
+                            uid = user?.uid ?: "",
+                            userLat = userLat,
+                            userLng = userLng,
+                            totalBookings = recentBookings.size,
+                            activeBookingId = activeBooking?._id,
+                            onLogout = onLogout,
+                            onNavigate = onNavigate
+                        )
+                    }
                 }
             }
 
@@ -3070,7 +3075,6 @@ fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNav
 
 }
 
-@Composable
 fun ProfileTabContent(
     name: String,
     phone: String,
@@ -3078,6 +3082,8 @@ fun ProfileTabContent(
     uid: String,
     userLat: Double,
     userLng: Double,
+    totalBookings: Int,
+    activeBookingId: String? = null,
     onLogout: () -> Unit,
     onNavigate: (String) -> Unit
 ) {
@@ -3282,7 +3288,7 @@ fun ProfileTabContent(
                     ) {
                         ProfileStatItem(
                             icon = Icons.Default.CalendarMonth,
-                            value = "${user?.totalJobs ?: 0}",
+                            value = "$totalBookings",
                             label = "Total Bookings"
                         )
                         Box(modifier = Modifier.width(1.dp).height(40.dp).background(MadadwalaColors.LightGray.copy(0.3f)))
@@ -3517,7 +3523,8 @@ fun ProfileTabContent(
                                     "uid" to uid,
                                     "name" to name,
                                     "phoneNumber" to phone,
-                                    "location" to mapOf("lat" to userLat, "lng" to userLng)
+                                    "location" to mapOf("lat" to userLat, "lng" to userLng),
+                                    "bookingId" to (activeBookingId ?: "")
                                 )
                                 // Use trackingApiService (Render) because it supports real-time Sockets
                                 val res = com.abhi.madadwala_1.data.remote.RetrofitClient.trackingApiService.sendSOS(sosData)

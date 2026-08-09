@@ -53,6 +53,7 @@ export default function AdminDashboard() {
   const [toast, setToast] = useState(null);
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [sosAlert, setSosAlert] = useState(null);
+  const [sosProviderUid, setSosProviderUid] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
   const audioRef = useRef(null);
 
@@ -73,8 +74,19 @@ export default function AdminDashboard() {
       setSocketConnected(false);
     });
 
-    socket.on('emergency_sos', (data) => {
+    socket.on('emergency_sos', async (data) => {
       console.log('🚨 EMERGENCY SOS RECEIVED:', data);
+
+      if (data.bookingId) {
+        try {
+          const res = await adminApi.getBookingDetails(data.bookingId);
+          data.bookingDetails = res.data;
+          setSosProviderUid(res.data.providerUid);
+        } catch (e) {
+          console.error("SOS Booking fetch error:", e);
+        }
+      }
+
       setSosAlert(data);
       playSiren();
     });
@@ -98,6 +110,7 @@ export default function AdminDashboard() {
       audioRef.current.currentTime = 0;
     }
     setSosAlert(null);
+    setSosProviderUid(null);
   };
 
   useEffect(() => { fetchTabData(activeTab); }, [activeTab]);
@@ -245,7 +258,7 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <div className={activeTab !== 'monitor' ? 'p-6 max-w-[1400px] mx-auto' : 'h-full'}>
-              {activeTab === 'monitor' && <MonitorView data={data.monitor} onRefresh={()=>fetchTabData('monitor')} selectedPartner={selectedPartner} setSelectedPartner={setSelectedPartner} />}
+              {activeTab === 'monitor' && <MonitorView data={data.monitor} onRefresh={()=>fetchTabData('monitor')} selectedPartner={selectedPartner} setSelectedPartner={setSelectedPartner} sosProviderUid={sosProviderUid} />}
               {activeTab === 'analytics' && <AnalyticsView data={data.analytics} />}
               {activeTab === 'customers' && <UsersTable users={data.allUsers} onWarn={(u)=>openAction('warning', u)} onWallet={(u)=>openAction('wallet', u)} onDelete={(u)=>openAction('delete', u)} onBlock={(u)=>adminApi.toggleBlock(u.uid).then(()=>{fetchTabData('customers'); showToast("Updated");})} onDetails={(u)=>openAction('details', u)} title="Customers" />}
               {activeTab === 'providers-all' && <UsersTable users={data.allProviders} onWarn={(u)=>openAction('warning', u)} onWallet={(u)=>openAction('wallet', u)} onDelete={(u)=>openAction('delete', u)} onBlock={(u)=>adminApi.toggleBlock(u.uid).then(()=>{fetchTabData('providers-all'); showToast("Updated");})} onDetails={(u)=>openAction('details', u)} title="Partners" isPartner />}
@@ -532,58 +545,107 @@ export default function AdminDashboard() {
       {sosAlert && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-red-600/20 backdrop-blur-sm animate-pulse"></div>
-          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-red-600 animate-in zoom-in duration-300">
-            <div className="bg-red-600 p-8 text-white text-center">
-              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                <ShieldAlert size={48} strokeWidth={2.5} />
-              </div>
-              <h2 className="text-3xl font-black uppercase tracking-tighter mb-1">Emergency SOS</h2>
-              <p className="text-red-100 font-medium">An emergency alert has been triggered!</p>
-            </div>
+          <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-red-600 animate-in zoom-in duration-300 flex flex-col md:flex-row h-[90vh] md:h-auto">
 
-            <div className="p-8 space-y-6">
-              <div className="flex items-center gap-4 p-4 bg-red-50 rounded-2xl border border-red-100">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 shrink-0">
-                  <Users size={24} />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-red-400 uppercase tracking-wider">User Details</p>
-                  <p className="text-lg font-bold text-gray-900">{sosAlert.name}</p>
-                  <p className="text-sm font-semibold text-gray-500">{sosAlert.phoneNumber}</p>
-                </div>
-              </div>
-
-              {sosAlert.location && (
-                <div className="space-y-3">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1">Last Known Location</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => window.open(`https://www.google.com/maps?q=${sosAlert.location.lat},${sosAlert.location.lng}`)}
-                      className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-black transition-colors"
-                    >
-                      <MapPin size={20} /> Open in Google Maps
-                    </button>
-                  </div>
-                  <p className="text-center text-[11px] text-gray-400 font-mono">
-                    Lat: {sosAlert.location.lat.toFixed(6)}, Lng: {sosAlert.location.lng.toFixed(6)}
-                  </p>
-                </div>
-              )}
-
-              <div className="pt-4 flex flex-col gap-3">
-                <a
-                  href={`tel:${sosAlert.phoneNumber}`}
-                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-center flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-lg shadow-emerald-200"
-                >
-                  <Phone size={20} /> CALL USER NOW
-                </a>
+            {/* Left Side: Map */}
+            <div className="flex-1 h-64 md:h-auto relative border-b md:border-b-0 md:border-r border-gray-100">
+                <MapComponent
+                    partners={sosAlert.bookingDetails ? [{
+                        uid: sosAlert.bookingDetails.providerUid,
+                        name: sosAlert.bookingDetails.providerName,
+                        lat: sosAlert.bookingDetails.providerLat,
+                        lng: sosAlert.bookingDetails.providerLng,
+                        status: 'busy',
+                        profileImage: sosAlert.bookingDetails.providerImage
+                    }] : []}
+                    distressedUser={sosAlert.location}
+                    sosProviderUid={sosAlert.bookingDetails?.providerUid}
+                />
                 <button
                   onClick={stopSiren}
-                  className="w-full py-3 text-gray-400 font-bold hover:text-gray-600 transition-colors"
+                  className="absolute top-4 right-4 z-10 p-2 bg-white rounded-full shadow-lg text-gray-400 hover:text-red-600 transition-colors"
                 >
-                  Dismiss & Stop Siren
+                  <X size={20} />
                 </button>
-              </div>
+            </div>
+
+            {/* Right Side: Info */}
+            <div className="w-full md:w-[400px] flex flex-col">
+                <div className="bg-red-600 p-6 text-white text-center">
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 animate-bounce">
+                        <ShieldAlert size={28} strokeWidth={2.5} />
+                    </div>
+                    <h2 className="text-xl font-black uppercase tracking-tighter mb-0.5">Emergency SOS</h2>
+                    <p className="text-red-100 text-xs font-medium">Immediate intervention required!</p>
+                </div>
+
+                <div className="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-5">
+                    {/* User Details */}
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Distressed User</p>
+                        <div className="flex items-center gap-4 p-4 bg-red-50 rounded-2xl border border-red-100">
+                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-600 shrink-0">
+                                <Users size={20} />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-sm font-bold text-gray-900 truncate">{sosAlert.name}</p>
+                                <p className="text-xs font-semibold text-gray-500">{sosAlert.phoneNumber}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Partner Details */}
+                    {sosAlert.bookingDetails && (
+                        <div className="space-y-2">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Assigned Partner</p>
+                            <div className="flex items-center gap-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                                <div className="w-10 h-10 bg-indigo-100 rounded-full overflow-hidden shrink-0 border-2 border-white">
+                                    <img src={sosAlert.bookingDetails.providerImage || 'https://via.placeholder.com/40'} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold text-indigo-900 truncate">{sosAlert.bookingDetails.providerName}</p>
+                                    <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">{sosAlert.bookingDetails.serviceName}</p>
+                                </div>
+                                <a href={`tel:${sosAlert.bookingDetails.providerPhone}`} className="ml-auto p-2 bg-white rounded-xl text-indigo-600 shadow-sm">
+                                    <Phone size={16} />
+                                </a>
+                        </div>
+                    </div>
+                    )}
+
+                    {/* Booking Info */}
+                    {sosAlert.bookingDetails && (
+                        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-xs space-y-2">
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">Order ID:</span>
+                                <span className="font-bold text-gray-700">#{sosAlert.bookingDetails._id.slice(-8).toUpperCase()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">Status:</span>
+                                <span className="font-bold text-indigo-600 uppercase">{sosAlert.bookingDetails.status}</span>
+                            </div>
+                            <div className="pt-2 border-t border-gray-200">
+                                <p className="text-gray-400 mb-1">Address:</p>
+                                <p className="font-medium text-gray-700 leading-relaxed">{sosAlert.bookingDetails.address}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="pt-2 flex flex-col gap-2">
+                        <a
+                            href={`tel:${sosAlert.phoneNumber}`}
+                            className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-center flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-lg shadow-emerald-200"
+                        >
+                            <Phone size={20} /> CALL USER NOW
+                        </a>
+                        <button
+                            onClick={stopSiren}
+                            className="w-full py-3 text-gray-400 font-bold hover:text-gray-600 transition-colors text-xs"
+                        >
+                            Dismiss & Close Alert
+                        </button>
+                    </div>
+                </div>
             </div>
           </div>
         </div>
@@ -608,7 +670,7 @@ function NavItem({ icon, label, active, onClick, count }) {
 }
 
 /* ---------- Live map ---------- */
-const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner }) => {
+const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner, sosProviderUid }) => {
   const [filter, setFilter] = useState('all');
   const filteredData = data.filter(p => filter === 'all' || p.status === filter);
   const counts = { total: data.length, online: data.filter(p => p.status === 'online').length, busy: data.filter(p => p.status === 'busy').length };
@@ -653,7 +715,7 @@ const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner }) =
         </div>
 
         <div className="flex-1 bg-white rounded-xl relative overflow-hidden border border-gray-200">
-          <div className="absolute inset-0 z-0"><MapComponent partners={filteredData} selectedPartner={selectedPartner} /></div>
+          <div className="absolute inset-0 z-0"><MapComponent partners={filteredData} selectedPartner={selectedPartner} sosProviderUid={sosProviderUid} /></div>
           <button onClick={onRefresh} className="absolute top-4 right-4 p-2.5 bg-white shadow-md rounded-lg z-10 hover:bg-gray-50 transition-colors border border-gray-100"><RefreshCw size={14}/></button>
           <div className="absolute bottom-4 left-4 p-3 bg-white/95 backdrop-blur rounded-xl shadow-md flex gap-5 border border-gray-100 z-10">
             <Legend color="bg-emerald-500" label="Online" /><Legend color="bg-indigo-600" label="Busy" /><Legend color="bg-gray-300" label="Offline" />

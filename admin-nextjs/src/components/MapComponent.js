@@ -5,18 +5,18 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
 
 // Elite Marker: Profile Image with High-Contrast Border and Status Dot
-const createEliteMarker = (status, imageUrl) => {
-  const statusColor = status === 'online' ? '#10b981' : status === 'busy' ? '#6366f1' : '#94a3b8';
+const createEliteMarker = (status, imageUrl, isSOS = false) => {
+  const statusColor = isSOS ? '#ef4444' : (status === 'online' ? '#10b981' : status === 'busy' ? '#6366f1' : '#94a3b8');
   const img = imageUrl || 'https://via.placeholder.com/40';
 
   return new L.DivIcon({
     html: `
-      <div class="elite-marker-wrapper" style="position: relative; width: 50px; height: 50px;">
+      <div class="elite-marker-wrapper ${isSOS ? 'sos-blink' : ''}" style="position: relative; width: 50px; height: 50px;">
         <div style="
           width: 48px;
           height: 48px;
           border-radius: 50%;
-          border: 4px solid white;
+          border: 4px solid ${isSOS ? '#ef4444' : 'white'};
           box-shadow: 0 4px 15px rgba(0,0,0,0.3);
           overflow: hidden;
           background: #f1f5f9;
@@ -47,7 +47,7 @@ const createEliteMarker = (status, imageUrl) => {
           height: 0;
           border-left: 10px solid transparent;
           border-right: 10px solid transparent;
-          border-top: 12px solid white;
+          border-top: 12px solid ${isSOS ? '#ef4444' : 'white'};
           margin-top: -6px;
         "></div>
       </div>
@@ -74,7 +74,7 @@ const MapController = ({ target }) => {
   return null;
 };
 
-export default function MapComponent({ partners = [], selectedPartner }) {
+export default function MapComponent({ partners = [], selectedPartner, sosProviderUid, distressedUser }) {
   // Default to Surat if no markers
   const defaultPos = [21.1702, 72.8311];
 
@@ -91,27 +91,44 @@ export default function MapComponent({ partners = [], selectedPartner }) {
           attribution='&copy; Google Maps'
         />
 
+        {distressedUser && distressedUser.lat && (
+            <Marker
+                position={[distressedUser.lat, distressedUser.lng]}
+                icon={new L.DivIcon({
+                    html: `<div class="sos-blink" style="width: 20px; height: 20px; background: #ef4444; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 15px #ef4444;"></div>`,
+                    className: 'custom-leaflet-marker',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10],
+                })}
+            >
+                <Popup offset={[0, -10]}>
+                    <div className="text-center font-bold text-red-600 text-[10px]">USER LOCATION</div>
+                </Popup>
+            </Marker>
+        )}
+
         {Array.isArray(partners) && partners.map((p) => {
           if (!p.lat || !p.lng || isNaN(p.lat) || isNaN(p.lng)) return null;
+          const isSOS = p.uid === sosProviderUid;
 
           return (
             <Marker
               key={p.uid}
               position={[p.lat, p.lng]}
-              icon={createEliteMarker(p.status, p.profileImage)}
-              zIndexOffset={selectedPartner?.uid === p.uid ? 1000 : 0}
+              icon={createEliteMarker(p.status, p.profileImage, isSOS)}
+              zIndexOffset={isSOS ? 2000 : (selectedPartner?.uid === p.uid ? 1000 : 0)}
             >
               <Popup offset={[0, -50]}>
                 <div className="text-center font-sans">
                   <p className="font-bold text-slate-800 uppercase text-[10px]">{p.name}</p>
-                  <p className="text-[9px] text-indigo-500 font-bold uppercase">{p.status}</p>
+                  <p className="text-[9px] text-indigo-500 font-bold uppercase">{isSOS ? '🚨 EMERGENCY' : p.status}</p>
                 </div>
               </Popup>
             </Marker>
           );
         })}
 
-        <MapController target={selectedPartner} />
+        <MapController target={selectedPartner || (distressedUser ? { lat: distressedUser.lat, lng: distressedUser.lng } : null)} />
       </MapContainer>
 
       {/* CSS fix for marker rendering */}
@@ -122,6 +139,14 @@ export default function MapComponent({ partners = [], selectedPartner }) {
         }
         .leaflet-marker-icon {
           will-change: transform;
+        }
+        @keyframes sos-pulse {
+          0% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 0px #ef4444); }
+          50% { transform: scale(1.15); opacity: 0.8; filter: drop-shadow(0 0 15px #ef4444); }
+          100% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 0px #ef4444); }
+        }
+        .sos-blink {
+          animation: sos-pulse 1s infinite ease-in-out;
         }
       `}</style>
     </div>

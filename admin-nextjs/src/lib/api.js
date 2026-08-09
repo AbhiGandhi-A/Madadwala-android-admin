@@ -17,6 +17,7 @@ export const adminApi = {
   updateWithdrawal: (id, data) => api.patch(`/admin/withdrawals/${id}`, data),
   getActiveJobs: () => api.get('/admin/active-jobs'),
   getAllBookings: () => api.get('/admin/all-bookings'),
+  getBookingDetails: (id) => api.get(`/bookings/${id}`),
   getCategories: () => api.get('/categories'),
   addCategory: (data) => api.post('/admin/categories', data),
   deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
