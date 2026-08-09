@@ -53,19 +53,35 @@ export default function AdminDashboard() {
   const [toast, setToast] = useState(null);
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [sosAlert, setSosAlert] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
   const audioRef = useRef(null);
 
   useEffect(() => {
     // Socket initialization for SOS alerts
-    const socket = io('https://madadwala-backend.onrender.com'); // Match backend URL
+    const socket = io('https://madadwala-backend.onrender.com', {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5
+    });
+
+    socket.on('connect', () => {
+      console.log('Admin Dashboard Socket Connected');
+      setSocketConnected(true);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Admin Dashboard Socket Disconnected');
+      setSocketConnected(false);
+    });
 
     socket.on('emergency_sos', (data) => {
-      console.log('EMERGENCY SOS RECEIVED:', data);
+      console.log('🚨 EMERGENCY SOS RECEIVED:', data);
       setSosAlert(data);
       playSiren();
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const playSiren = () => {
@@ -211,7 +227,13 @@ export default function AdminDashboard() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
-          <h2 className="text-[15px] font-semibold text-gray-900">{tabTitles[activeTab] || activeTab}</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-[15px] font-semibold text-gray-900">{tabTitles[activeTab] || activeTab}</h2>
+            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${socketConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600 animate-pulse'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${socketConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+              {socketConnected ? 'Live' : 'Offline'}
+            </div>
+          </div>
           <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold text-xs">A</div>
         </header>
 

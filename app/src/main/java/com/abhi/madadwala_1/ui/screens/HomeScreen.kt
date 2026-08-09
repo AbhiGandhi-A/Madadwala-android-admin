@@ -3519,7 +3519,8 @@ fun ProfileTabContent(
                                     "phoneNumber" to phone,
                                     "location" to mapOf("lat" to userLat, "lng" to userLng)
                                 )
-                                val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.sendSOS(sosData)
+                                // Use trackingApiService (Render) because it supports real-time Sockets
+                                val res = com.abhi.madadwala_1.data.remote.RetrofitClient.trackingApiService.sendSOS(sosData)
                                 if (res.isSuccessful) {
                                     Toast.makeText(context, "Emergency alert sent successfully!", Toast.LENGTH_LONG).show()
                                 } else {
