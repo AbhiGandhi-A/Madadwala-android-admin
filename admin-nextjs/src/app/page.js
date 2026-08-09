@@ -68,7 +68,11 @@ export default function AdminDashboard() {
   };
 
   const cleanupWebRTC = () => {
+    console.log("Cleaning up WebRTC...");
     if (pcRef.current) {
+      pcRef.current.getSenders().forEach(sender => {
+        if (sender.track) sender.track.stop();
+      });
       pcRef.current.close();
       pcRef.current = null;
     }
@@ -79,9 +83,24 @@ export default function AdminDashboard() {
     setIsMuted(false);
   };
 
+  const getMicrophonePermission = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = stream;
+      return stream;
+    } catch (err) {
+      console.error("Mic Error:", err);
+      showToast("Microphone access denied. Please enable it in browser settings.", "error");
+      throw err;
+    }
+  };
+
   const initiateCall = async (targetUid, targetName = 'User', bookingId = 'admin_call') => {
     try {
-      cleanupWebRTC(); // Ensure clean state
+      cleanupWebRTC();
+      // Request permission immediately on user gesture
+      const stream = await getMicrophonePermission();
+
       setActiveCall({ status: 'dialing', targetName, targetUid, duration: 0 });
       const res = await adminApi.startCall({
         bookingId: bookingId,
@@ -96,16 +115,26 @@ export default function AdminDashboard() {
         }
       }
     } catch (e) {
-      showToast("Call failed. App might be offline.", "error");
+      console.error("Call Init Error:", e);
       setActiveCall(null);
     }
   };
 
-  const startWebRTC = async (targetUid) => {
+  const acceptIncomingCall = async () => {
+    if (!activeCall?.callId) return;
     try {
-      console.log("Starting WebRTC for:", targetUid);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      localStreamRef.current = stream;
+        const stream = await getMicrophonePermission();
+        socketRef.current.emit('call_accepted', { callId: activeCall.callId });
+        setActiveCall(prev => ({ ...prev, status: 'connected' }));
+    } catch (e) {
+        endActiveCall();
+    }
+  };
+
+  const startWebRTC = async (targetUid, isIncoming = false) => {
+    try {
+      console.log("Starting WebRTC negotiation. Incoming:", isIncoming);
+      const stream = localStreamRef.current || await getMicrophonePermission();
 
       const pc = new RTCPeerConnection(rtcConfig);
       pcRef.current = pc;
@@ -119,20 +148,21 @@ export default function AdminDashboard() {
       };
 
       pc.ontrack = (event) => {
-        console.log("Remote track received");
+        console.log("Remote audio track received");
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
-          remoteAudioRef.current.play().catch(e => console.error("Audio play failed:", e));
+          remoteAudioRef.current.play().catch(e => console.error("Autoplay blocked:", e));
         }
       };
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socketRef.current.emit('offer', { to: targetUid, offer });
+      if (!isIncoming) {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socketRef.current.emit('offer', { to: targetUid, offer });
+      }
 
     } catch (err) {
-      console.error("WebRTC Error:", err);
-      showToast("Microphone access denied or error occurred.", "error");
+      console.error("WebRTC Setup Error:", err);
     }
   };
 
@@ -205,16 +235,30 @@ export default function AdminDashboard() {
     });
 
     // Call Signalling for Admin
+    socket.on('incoming_call', (data) => {
+      console.log('Incoming call:', data);
+      setActiveCall({
+        status: 'incoming',
+        targetName: data.callerName,
+        targetUid: data.callerId,
+        callId: data.callId,
+        duration: 0
+      });
+      playSiren(); // Reuse siren as ringtone
+    });
+
     socket.on('ringing', (data) => {
       setActiveCall(prev => (prev && prev.callId === data.callId) ? { ...prev, status: 'ringing' } : prev);
     });
 
     socket.on('call_accepted', (data) => {
+      stopSiren();
       setActiveCall(prev => (prev && prev.callId === data.callId) ? { ...prev, status: 'connected' } : prev);
     });
 
     socket.on('call_ended', (data) => {
       cleanupWebRTC();
+      stopSiren();
       setActiveCall(prev => (prev && prev.callId === data.callId) ? { ...prev, status: 'ended' } : prev);
       setTimeout(() => setActiveCall(null), 2000);
     });
@@ -222,6 +266,36 @@ export default function AdminDashboard() {
     // WebRTC Signaling
     socket.on('offer', async (data) => {
       console.log("RTC Offer received:", data);
+      if (pcRef.current) {
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await pcRef.current.createAnswer();
+        await pcRef.current.setLocalDescription(answer);
+        socketRef.current.emit('answer', { to: data.from, answer });
+      } else {
+        // If PC not ready, we might need to initialize it
+        // This happens if Admin is the receiver
+        const stream = localStreamRef.current || await getMicrophonePermission();
+        const pc = new RTCPeerConnection(rtcConfig);
+        pcRef.current = pc;
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        pc.onicecandidate = (event) => {
+            if (event.candidate && socketRef.current) {
+              socketRef.current.emit('ice_candidate', { to: data.from, candidate: event.candidate });
+            }
+        };
+        pc.ontrack = (event) => {
+            if (remoteAudioRef.current) {
+              remoteAudioRef.current.srcObject = event.streams[0];
+              remoteAudioRef.current.play().catch(e => console.error("Autoplay blocked:", e));
+            }
+        };
+
+        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socketRef.current.emit('answer', { to: data.from, answer });
+      }
     });
 
     socket.on('answer', async (data) => {
@@ -246,7 +320,10 @@ export default function AdminDashboard() {
   // Call Negotiation Trigger
   useEffect(() => {
     if (activeCall?.status === 'connected' && activeCall?.targetUid && !pcRef.current) {
-        startWebRTC(activeCall.targetUid);
+        // Only initiate offer if we are the caller (dialing/ringing states preceded connected)
+        // If we are the receiver, we wait for the offer.
+        // For simplicity, let's always try to start WebRTC if not started.
+        startWebRTC(activeCall.targetUid, false);
     }
   }, [activeCall?.status, activeCall?.targetUid]);
 
@@ -840,6 +917,7 @@ export default function AdminDashboard() {
                 </div>
                 <h3 className="text-white font-bold text-lg">{activeCall.targetName}</h3>
                 <p className="text-emerald-100 text-xs font-medium uppercase tracking-widest mt-1">
+                    {activeCall.status === 'incoming' && 'Incoming Call...'}
                     {activeCall.status === 'dialing' && 'Connecting...'}
                     {activeCall.status === 'ringing' && 'Ringing...'}
                     {activeCall.status === 'connected' && formatDuration(activeCall.duration)}
@@ -849,21 +927,40 @@ export default function AdminDashboard() {
 
             <div className="p-6 bg-white flex flex-col gap-4">
                 <audio ref={remoteAudioRef} autoPlay />
-                <div className="flex justify-center gap-8">
-                    <button onClick={toggleMute} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isMuted ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}>
-                        {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
-                    </button>
-                    <button className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
-                        <Maximize2 size={20} />
-                    </button>
-                </div>
+                {activeCall.status === 'connected' && (
+                    <div className="flex justify-center gap-8">
+                        <button onClick={toggleMute} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isMuted ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}>
+                            {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+                        </button>
+                        <button className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
+                            <Maximize2 size={20} />
+                        </button>
+                    </div>
+                )}
 
-                <button
-                    onClick={endActiveCall}
-                    className={`w-full py-4 rounded-2xl font-black text-sm tracking-wider transition-all active:scale-[0.98] shadow-lg ${activeCall.status === 'ended' ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white shadow-red-100'}`}
-                >
-                    {activeCall.status === 'ended' ? 'CLOSING...' : 'END CALL'}
-                </button>
+                {activeCall.status === 'incoming' ? (
+                    <div className="flex flex-col gap-2">
+                        <button
+                            onClick={acceptIncomingCall}
+                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-sm tracking-wider transition-all active:scale-[0.98] shadow-lg shadow-emerald-100"
+                        >
+                            ACCEPT CALL
+                        </button>
+                        <button
+                            onClick={endActiveCall}
+                            className="w-full py-3 bg-red-50 text-red-600 rounded-2xl font-bold text-xs hover:bg-red-100 transition-all"
+                        >
+                            DECLINE
+                        </button>
+                    </div>
+                ) : (
+                    <button
+                        onClick={endActiveCall}
+                        className={`w-full py-4 rounded-2xl font-black text-sm tracking-wider transition-all active:scale-[0.98] shadow-lg ${activeCall.status === 'ended' ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white shadow-red-100'}`}
+                    >
+                        {activeCall.status === 'ended' ? 'CLOSING...' : 'END CALL'}
+                    </button>
+                )}
             </div>
         </div>
       )}
