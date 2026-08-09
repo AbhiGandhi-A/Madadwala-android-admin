@@ -55,18 +55,51 @@ export default function AdminDashboard() {
   const [sosAlert, setSosAlert] = useState(null);
   const [sosProviderUid, setSosProviderUid] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [activeCall, setActiveCall] = useState(null); // { status: 'dialing'|'ringing'|'connected'|'ended', targetName, targetUid, callId, duration: 0 }
   const audioRef = useRef(null);
+  const socketRef = useRef(null);
+
+  const initiateCall = async (targetUid, targetName = 'User', bookingId = 'admin_call') => {
+    try {
+      setActiveCall({ status: 'dialing', targetName, targetUid, duration: 0 });
+      const res = await adminApi.startCall({
+        bookingId: bookingId,
+        customerId: targetUid,
+        partnerId: 'admin',
+        callerId: 'admin'
+      });
+      if (res.data.success) {
+        setActiveCall(prev => ({ ...prev, callId: res.data.callId }));
+        if (socketRef.current) {
+            socketRef.current.emit('join', 'admin');
+        }
+      }
+    } catch (e) {
+      showToast("Call failed. App might be offline.", "error");
+      setActiveCall(null);
+    }
+  };
+
+  const endActiveCall = () => {
+    if (activeCall?.callId && socketRef.current) {
+      socketRef.current.emit('end_call', { callId: activeCall.callId });
+    }
+    setActiveCall(prev => prev ? { ...prev, status: 'ended' } : null);
+    setTimeout(() => setActiveCall(null), 2000);
+  };
 
   useEffect(() => {
-    // Socket initialization for SOS alerts
+    // Socket initialization for SOS and Call alerts
     const socket = io('https://madadwala-backend.onrender.com', {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5
     });
+    socketRef.current = socket;
 
     socket.on('connect', () => {
       console.log('Admin Dashboard Socket Connected');
       setSocketConnected(true);
+      socket.emit('join', 'admin');
     });
 
     socket.on('disconnect', () => {
@@ -104,10 +137,41 @@ export default function AdminDashboard() {
       });
     });
 
+    // Call Signalling for Admin
+    socket.on('ringing', (data) => {
+      setActiveCall(prev => (prev && prev.callId === data.callId) ? { ...prev, status: 'ringing' } : prev);
+    });
+
+    socket.on('call_accepted', (data) => {
+      setActiveCall(prev => (prev && prev.callId === data.callId) ? { ...prev, status: 'connected' } : prev);
+    });
+
+    socket.on('call_ended', (data) => {
+      setActiveCall(prev => (prev && prev.callId === data.callId) ? { ...prev, status: 'ended' } : prev);
+      setTimeout(() => setActiveCall(null), 2000);
+    });
+
     return () => {
       socket.disconnect();
     };
   }, []);
+
+  // Call Duration Timer
+  useEffect(() => {
+    let interval;
+    if (activeCall?.status === 'connected') {
+      interval = setInterval(() => {
+        setActiveCall(prev => prev ? { ...prev, duration: prev.duration + 1 } : null);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [activeCall?.status]);
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const playSiren = () => {
     if (!audioRef.current) {
@@ -624,9 +688,12 @@ export default function AdminDashboard() {
                                     <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">{sosAlert.bookingDetails.serviceName}</p>
                                 </div>
                                 {sosAlert.bookingDetails.providerPhone && (
-                                    <a href={`tel:${sosAlert.bookingDetails.providerPhone}`} className="ml-auto p-2 bg-white rounded-xl text-indigo-600 shadow-sm hover:bg-indigo-50 transition-colors">
+                                    <button
+                                        onClick={() => initiateCall(sosAlert.bookingDetails.providerUid, sosAlert.bookingDetails.providerName, sosAlert.bookingId)}
+                                        className="ml-auto p-2 bg-white rounded-xl text-indigo-600 shadow-sm hover:bg-indigo-50 transition-colors"
+                                    >
                                         <Phone size={16} />
-                                    </a>
+                                    </button>
                                 )}
                         </div>
                     </div>
@@ -651,12 +718,12 @@ export default function AdminDashboard() {
                     )}
 
                     <div className="pt-2 flex flex-col gap-2">
-                        <a
-                            href={`tel:${sosAlert.phoneNumber}`}
+                        <button
+                            onClick={() => initiateCall(sosAlert.uid, sosAlert.name, sosAlert.bookingId)}
                             className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black text-center flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-lg shadow-emerald-200"
                         >
                             <Phone size={20} /> CALL USER NOW
-                        </a>
+                        </button>
                         <button
                             onClick={stopSiren}
                             className="w-full py-3 text-gray-400 font-bold hover:text-gray-600 transition-colors text-xs"
@@ -667,6 +734,42 @@ export default function AdminDashboard() {
                 </div>
             </div>
           </div>
+        </div>
+      )}
+      {/* VoIP Calling UI */}
+      {activeCall && (
+        <div className="fixed bottom-6 right-6 z-[300] w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+            <div className={`p-6 text-center ${activeCall.status === 'ended' ? 'bg-gray-100' : 'bg-emerald-600'}`}>
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 relative">
+                    <div className={`absolute inset-0 bg-white/30 rounded-full ${activeCall.status === 'connected' ? 'animate-ping' : ''}`}></div>
+                    <Users size={32} className="text-white relative z-10" />
+                </div>
+                <h3 className="text-white font-bold text-lg">{activeCall.targetName}</h3>
+                <p className="text-emerald-100 text-xs font-medium uppercase tracking-widest mt-1">
+                    {activeCall.status === 'dialing' && 'Connecting...'}
+                    {activeCall.status === 'ringing' && 'Ringing...'}
+                    {activeCall.status === 'connected' && formatDuration(activeCall.duration)}
+                    {activeCall.status === 'ended' && 'Call Ended'}
+                </p>
+            </div>
+
+            <div className="p-6 bg-white flex flex-col gap-4">
+                <div className="flex justify-center gap-8">
+                    <button className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
+                        <MicOff size={20} />
+                    </button>
+                    <button className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
+                        <Maximize2 size={20} />
+                    </button>
+                </div>
+
+                <button
+                    onClick={endActiveCall}
+                    className={`w-full py-4 rounded-2xl font-black text-sm tracking-wider transition-all active:scale-[0.98] shadow-lg ${activeCall.status === 'ended' ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white shadow-red-100'}`}
+                >
+                    {activeCall.status === 'ended' ? 'CLOSING...' : 'END CALL'}
+                </button>
+            </div>
         </div>
       )}
     </div>
@@ -761,7 +864,12 @@ const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner, sos
           </div>
           <div className="flex flex-col gap-2 ml-auto">
             <button className="px-6 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg font-semibold text-[12px] transition-colors">Center on map</button>
-            <button className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-semibold text-[12px] transition-colors">Contact partner</button>
+            <button
+              onClick={() => initiateCall(selectedPartner.uid, selectedPartner.name)}
+              className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-semibold text-[12px] transition-colors"
+            >
+              Contact partner
+            </button>
           </div>
         </div>
       )}
@@ -851,7 +959,8 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
                 <td className="px-6 py-3.5 text-center">
                   <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${u.isBlocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>{u.isBlocked ? 'Blocked' : 'Active'}</span>
                 </td>
-                <td className="px-6 py-3.5 text-right space-x-1.5">
+                <td className="px-6 py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                  <button title="Call" onClick={() => initiateCall(u.uid, u.name)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors"><Phone size={15}/></button>
                   <button title="Warn" onClick={()=>onWarn(u)} className="p-2 bg-amber-50 text-amber-500 rounded-lg hover:bg-amber-500 hover:text-white transition-colors"><AlertTriangle size={15}/></button>
                   <button title="Wallet" onClick={()=>onWallet(u)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"><Wallet size={15}/></button>
                   <button title={u.isBlocked ? 'Unblock' : 'Block'} onClick={()=>onBlock(u)} className={`p-2 rounded-lg transition-colors ${u.isBlocked ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-900 hover:text-white'}`}><ShieldAlert size={15}/></button>

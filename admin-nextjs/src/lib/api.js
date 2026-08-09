@@ -52,6 +52,7 @@ export const adminApi = {
   deleteReview: (id) => api.delete(`/admin/reviews/${id}`),
   broadcast: (data) => api.post('/admin/broadcast', data),
   getMonitor: () => trackingApi.get('/admin/operations-monitor'),
+  startCall: (data) => trackingApi.post('/call/start', data),
 };
 
 export default api;

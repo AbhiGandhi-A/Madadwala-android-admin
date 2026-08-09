@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -48,11 +49,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import android.content.Intent
+import android.widget.Toast
 import com.abhi.madadwala_1.services.LocationService
 import com.abhi.madadwala_1.services.SocketHandler
 import io.socket.client.Socket
 import org.json.JSONObject
 import com.abhi.madadwala_1.utils.PolylineDecoder
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 import com.abhi.madadwala_1.ui.viewmodel.CallViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -76,6 +81,8 @@ fun ProviderActiveJobScreen(
     var booking by remember { mutableStateOf<BookingResponse?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var showChatSheet by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    var showSosDialog by remember { mutableStateOf(false) }
 
     BackHandler(enabled = showChatSheet) {
         showChatSheet = false
@@ -281,6 +288,12 @@ fun ProviderActiveJobScreen(
                 },
                 actions = {
                     IconButton(
+                        onClick = { showSosDialog = true },
+                        modifier = Modifier.padding(end = 4.dp).background(Color(0xFFFFEBEE), CircleShape).size(40.dp)
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = "SOS", tint = Color.Red, modifier = Modifier.size(24.dp))
+                    }
+                    IconButton(
                         onClick = {
                             booking?.let { b ->
                                 callViewModel.startCall(
@@ -319,7 +332,7 @@ fun ProviderActiveJobScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp)
+                        .height(350.dp)
                 ) {
                     GoogleMap(
                         modifier = Modifier.fillMaxSize(),
@@ -413,15 +426,20 @@ fun ProviderActiveJobScreen(
                                 Text(
                                     text = booking?.customerName ?: "Customer",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
+                                    fontSize = 16.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = booking?.serviceName ?: "Service",
                                     fontSize = 14.sp,
-                                    color = MadadwalaColors.Gray
+                                    color = MadadwalaColors.Gray,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Button(
+                            
+                            IconButton(
                                 onClick = {
                                     booking?.let { b ->
                                         callViewModel.startCall(
@@ -432,32 +450,27 @@ fun ProviderActiveJobScreen(
                                         )
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF9FAFB)),
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                                modifier = Modifier.size(40.dp).background(Color(0xFFF9FAFB), CircleShape).border(1.dp, Color(0xFFE5E7EB), CircleShape)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Call, contentDescription = null, tint = MadadwalaColors.Green, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Call", color = MadadwalaColors.Ink, fontWeight = FontWeight.Bold)
-                                }
+                                Icon(Icons.Default.Call, contentDescription = "Call", tint = MadadwalaColors.Green, modifier = Modifier.size(20.dp))
                             }
 
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            Button(
+                            IconButton(
                                 onClick = { showChatSheet = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF9FAFB)),
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                                modifier = Modifier.size(40.dp).background(Color(0xFFF9FAFB), CircleShape).border(1.dp, Color(0xFFE5E7EB), CircleShape)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Chat, contentDescription = null, tint = MadadwalaColors.Green, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Chat", color = MadadwalaColors.Ink, fontWeight = FontWeight.Bold)
-                                }
+                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat", tint = MadadwalaColors.Green, modifier = Modifier.size(20.dp))
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            IconButton(
+                                onClick = { showReportDialog = true },
+                                modifier = Modifier.size(40.dp).background(Color(0xFFF9FAFB), CircleShape).border(1.dp, Color(0xFFE5E7EB), CircleShape)
+                            ) {
+                                Icon(Icons.Default.Flag, contentDescription = "Report", tint = Color.Red, modifier = Modifier.size(20.dp))
                             }
                         }
 
@@ -725,6 +738,114 @@ fun ProviderActiveJobScreen(
         com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
             bookingId = bookingId,
             onDismiss = { showChatSheet = false }
+        )
+    }
+
+    if (showSosDialog) {
+        AlertDialog(
+            onDismissRequest = { showSosDialog = false },
+            title = { Text("EMERGENCY SOS", color = Color.Red, fontWeight = FontWeight.Black) },
+            text = { Text("Are you in danger? Clicking 'Send SOS' will alert our emergency team with your live location and job details immediately.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = RetrofitClient.trackingApiService.sendSOS(mapOf(
+                                    "bookingId" to bookingId,
+                                    "uid" to (booking?.providerUid ?: ""),
+                                    "name" to (booking?.providerName ?: "Partner"),
+                                    "location" to mapOf(
+                                        "lat" to (providerLocation?.latitude ?: 0.0),
+                                        "lng" to (providerLocation?.longitude ?: 0.0)
+                                    )
+                                ))
+                                if (res.isSuccessful) {
+                                    Toast.makeText(context, "SOS Sent! Emergency team is on the way.", Toast.LENGTH_LONG).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to send SOS. Please call police.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        showSosDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("SEND SOS", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSosDialog = false }) { 
+                    Text("Cancel", color = MadadwalaColors.Gray, fontWeight = FontWeight.Bold) 
+                }
+            }
+        )
+    }
+
+    if (showReportDialog) {
+        var reason by remember { mutableStateOf("") }
+        var description by remember { mutableStateOf("") }
+        var isReporting by remember { mutableStateOf(false) }
+        
+        AlertDialog(
+            onDismissRequest = { if (!isReporting) showReportDialog = false },
+            title = { Text("Report Issue", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Reporting customer: ${booking?.customerName}")
+                    OutlinedTextField(
+                        value = reason,
+                        onValueChange = { reason = it },
+                        label = { Text("Reason (e.g. Misbehavior, Location issue)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Detailed Description") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            isReporting = true
+                            try {
+                                val reporterUid = (booking?.providerUid ?: "").toRequestBody("text/plain".toMediaTypeOrNull())
+                                val reportedUid = (booking?.customerUid ?: "").toRequestBody("text/plain".toMediaTypeOrNull())
+                                val reasonBody = reason.toRequestBody("text/plain".toMediaTypeOrNull())
+                                val descBody = description.toRequestBody("text/plain".toMediaTypeOrNull())
+                                
+                                val res = RetrofitClient.apiService.submitReport(
+                                    reporterUid, reportedUid, reasonBody, descBody, null
+                                )
+                                if (res.isSuccessful) {
+                                    Toast.makeText(context, "Report submitted. We will investigate.", Toast.LENGTH_LONG).show()
+                                    showReportDialog = false
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to submit report", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                isReporting = false
+                            }
+                        }
+                    },
+                    enabled = reason.isNotBlank() && !isReporting,
+                    colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Red)
+                ) {
+                    if (isReporting) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
+                    else Text("Submit Report")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReportDialog = false }, enabled = !isReporting) { 
+                    Text("Cancel", color = MadadwalaColors.Gray, fontWeight = FontWeight.Bold) 
+                }
+            }
         )
     }
 }

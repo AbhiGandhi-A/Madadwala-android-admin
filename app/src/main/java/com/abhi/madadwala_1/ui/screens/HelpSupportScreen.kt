@@ -89,7 +89,7 @@ fun HelpSupportScreen(onBack: () -> Unit) {
             }
 
             if (selectedTabIndex == 0) {
-                FAQContent()
+                FAQContent(user?.role ?: "customer")
             } else {
                 ChatSupportContent(
                     supportViewModel = supportViewModel,
@@ -104,16 +104,28 @@ fun HelpSupportScreen(onBack: () -> Unit) {
 }
 
 @Composable
-fun FAQContent() {
-    val faqs = listOf(
-        FAQItem("How to book a service?", "You can book a service by selecting a category from the home screen, choosing a provider, and following the 4-step booking flow."),
-        FAQItem("What are the payment methods?", "We support Online Payment (UPI, Cards, NetBanking), Wallet, and Cash after service."),
-        FAQItem("How can I cancel my booking?", "Go to your active booking details and click on the 'Cancel' button. Refunds for paid bookings are processed to your wallet instantly."),
-        FAQItem("How do I contact the provider?", "Once a booking is accepted, you can use the 'Call' or 'Chat' buttons in the booking details to reach the provider."),
-        FAQItem("Is Madadwala safe?", "Yes, all our service providers are background-verified and we provide 24/7 support for any concerns."),
-        FAQItem("How to add money to wallet?", "Go to the 'Wallet' tab and click 'Add Money'. You can use UPI or any other online method to top up your wallet."),
-        FAQItem("What if the work is not done properly?", "You can raise a concern via the 'Chat Support' tab or report the provider from their profile. We'll ensure it's resolved.")
-    )
+fun FAQContent(role: String) {
+    val faqs = if (role == "provider") {
+        listOf(
+            FAQItem("How to accept a job request?", "When a new job request appears on your dashboard, you can click 'Accept' to view details and confirm your arrival time."),
+            FAQItem("How do I receive payments?", "Payments for completed jobs are credited to your wallet. You can request a withdrawal to your bank account from the Payouts tab."),
+            FAQItem("What if a customer cancels?", "If a customer cancels after you've started the trip, a cancellation fee may be credited to your wallet as per our policy."),
+            FAQItem("How to update my service charges?", "Go to Profile > Edit Service Charges to set and update your prices for various services."),
+            FAQItem("Is my location tracked?", "We only track your location when you are 'Online' or during an active job to assign nearby requests and show your progress to the customer."),
+            FAQItem("What to do in case of emergency?", "Use the SOS button in the Active Job screen for immediate assistance during any safety concerns."),
+            FAQItem("How to contact support?", "You can use the 'Chat Support' tab to talk to our executive for any payment or technical discrepancies.")
+        )
+    } else {
+        listOf(
+            FAQItem("How to book a service?", "You can book a service by selecting a category from the home screen, choosing a provider, and following the 4-step booking flow."),
+            FAQItem("What are the payment methods?", "We support Online Payment (UPI, Cards, NetBanking), Wallet, and Cash after service."),
+            FAQItem("How can I cancel my booking?", "Go to your active booking details and click on the 'Cancel' button. Refunds for paid bookings are processed to your wallet instantly."),
+            FAQItem("How do I contact the provider?", "Once a booking is accepted, you can use the 'Call' or 'Chat' buttons in the booking details to reach the provider."),
+            FAQItem("Is Madadwala safe?", "Yes, all our service providers are background-verified and we provide 24/7 support for any concerns."),
+            FAQItem("How to add money to wallet?", "Go to the 'Wallet' tab and click 'Add Money'. You can use UPI or any other online method to top up your wallet."),
+            FAQItem("What if the work is not done properly?", "You can raise a concern via the 'Chat Support' tab or report the provider from their profile. We'll ensure it's resolved.")
+        )
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -189,7 +201,8 @@ fun ChatSupportContent(
     listState: androidx.compose.foundation.lazy.LazyListState
 ) {
     var messageText by remember { mutableStateOf("") }
-    var currentBotOptions by remember { mutableStateOf(getInitialBotQuestions()) }
+    val initialBotQuestions = if (user?.role == "provider") getPartnerBotQuestions() else getInitialBotQuestions()
+    var currentBotOptions by remember { mutableStateOf(initialBotQuestions) }
     var botBreadcrumb by remember { mutableStateOf<List<String>>(emptyList()) }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -288,7 +301,7 @@ fun ChatSupportContent(
                         
                         if (botBreadcrumb.isNotEmpty()) {
                             TextButton(onClick = {
-                                currentBotOptions = getInitialBotQuestions()
+                                currentBotOptions = if (user?.role == "provider") getPartnerBotQuestions() else getInitialBotQuestions()
                                 botBreadcrumb = emptyList()
                             }) {
                                 Text("Back to main menu", color = Color.Gray, fontSize = 12.sp)
@@ -360,6 +373,30 @@ fun getInitialBotQuestions() = listOf(
         BotOption("Work not done properly"),
         BotOption("Provider was rude"),
         BotOption("Safety concern"),
+        BotOption("Raise a Ticket")
+    )),
+    BotOption("Something else", listOf(
+        BotOption("Raise a Ticket")
+    ))
+)
+
+fun getPartnerBotQuestions() = listOf(
+    BotOption("Payment Issues", listOf(
+        BotOption("Payment Discrepancy"),
+        BotOption("Withdrawal delay"),
+        BotOption("Platform fee query"),
+        BotOption("Raise a Ticket")
+    )),
+    BotOption("Job Issues", listOf(
+        BotOption("Customer not reachable"),
+        BotOption("Wrong location provided"),
+        BotOption("Customer Misbehavior"),
+        BotOption("Raise a Ticket")
+    )),
+    BotOption("Technical Issues", listOf(
+        BotOption("App crashing/freezing"),
+        BotOption("Location tracking error"),
+        BotOption("OTP not working"),
         BotOption("Raise a Ticket")
     )),
     BotOption("Something else", listOf(
