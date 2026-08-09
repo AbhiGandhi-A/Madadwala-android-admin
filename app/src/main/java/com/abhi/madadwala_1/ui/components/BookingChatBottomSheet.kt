@@ -216,9 +216,9 @@ fun ChatTopBar(
                     }
                 }
                 Text(
-                    text = if (partnerProfile?.isAvailable == true) "Online" else "Offline",
+                    text = if (partnerProfile?.isOnline == true) "Online" else "Offline",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (partnerProfile?.isAvailable == true) Color(0xFF4CAF50) else Color.Gray
+                    color = if (partnerProfile?.isOnline == true) Color(0xFF4CAF50) else Color.Gray
                 )
             }
             

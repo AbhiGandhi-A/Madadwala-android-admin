@@ -502,6 +502,7 @@ data class ProviderResponse(
     val isVerified: Boolean,
     val profileImage: String? = null,
     val isAvailable: Boolean = true,
+    val isOnline: Boolean = false,
     val totalJobs: Int = 0,
     val totalEarnings: Double = 0.0,
     val lat: Double? = null,
