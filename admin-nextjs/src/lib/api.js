@@ -1,9 +1,14 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://madadwala-backend.onrender.com/api';
+const API_BASE_URL = 'https://madadwala-backend.vercel.app/api';
+const RENDER_BASE_URL = 'https://madadwala-backend.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+});
+
+const trackingApi = axios.create({
+  baseURL: RENDER_BASE_URL,
 });
 
 export const adminApi = {
@@ -18,6 +23,7 @@ export const adminApi = {
   getActiveJobs: () => api.get('/admin/active-jobs'),
   getAllBookings: () => api.get('/admin/all-bookings'),
   getBookingDetails: (id) => api.get(`/bookings/${id}`),
+  getSOSBookingDetails: (id) => trackingApi.get(`/bookings/${id}`),
   getCategories: () => api.get('/categories'),
   addCategory: (data) => api.post('/admin/categories', data),
   deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
@@ -45,7 +51,7 @@ export const adminApi = {
   getAllReviews: () => api.get('/admin/reviews'),
   deleteReview: (id) => api.delete(`/admin/reviews/${id}`),
   broadcast: (data) => api.post('/admin/broadcast', data),
-  getMonitor: () => api.get('/admin/operations-monitor'),
+  getMonitor: () => trackingApi.get('/admin/operations-monitor'),
 };
 
 export default api;

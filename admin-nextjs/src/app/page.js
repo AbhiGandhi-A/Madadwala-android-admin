@@ -80,7 +80,7 @@ export default function AdminDashboard() {
       if (data.bookingId) {
         socket.emit('join_booking', data.bookingId); // Join booking room for live updates
         try {
-          const res = await adminApi.getBookingDetails(data.bookingId);
+          const res = await adminApi.getSOSBookingDetails(data.bookingId);
           data.bookingDetails = res.data;
           setSosProviderUid(res.data.providerUid);
         } catch (e) {
