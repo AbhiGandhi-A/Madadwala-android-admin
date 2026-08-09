@@ -5,9 +5,10 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect } from 'react';
 
 // Elite Marker: Profile Image with High-Contrast Border and Status Dot
-const createEliteMarker = (status, imageUrl, isSOS = false) => {
+const createEliteMarker = (status, imageUrl, isSOS = false, name = '') => {
   const statusColor = isSOS ? '#ef4444' : (status === 'online' ? '#10b981' : status === 'busy' ? '#6366f1' : '#94a3b8');
-  const img = imageUrl || 'https://via.placeholder.com/40';
+  const img = imageUrl && imageUrl !== 'null' && imageUrl !== 'undefined' ? imageUrl : null;
+  const initials = name ? name.charAt(0).toUpperCase() : 'P';
 
   return new L.DivIcon({
     html: `
@@ -19,12 +20,15 @@ const createEliteMarker = (status, imageUrl, isSOS = false) => {
           border: 4px solid ${isSOS ? '#ef4444' : 'white'};
           box-shadow: 0 4px 15px rgba(0,0,0,0.3);
           overflow: hidden;
-          background: #f1f5f9;
+          background: ${isSOS ? '#fee2e2' : '#f1f5f9'};
           display: flex;
           align-items: center;
           justify-content: center;
         ">
-          <img src="${img}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\\'font-weight:bold;color:#ccc;font-size:10px;\\\'>IMG</div>'" />
+          ${img ?
+            `<img src="${img}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\\'font-weight:bold;color:${isSOS ? '#ef4444' : '#ccc'};font-size:16px;\\\'>${initials}</div>'" />` :
+            `<div style="font-weight:bold;color:${isSOS ? '#ef4444' : '#ccc'};font-size:16px;">${initials}</div>`
+          }
         </div>
         <div style="
           position: absolute;
@@ -115,7 +119,7 @@ export default function MapComponent({ partners = [], selectedPartner, sosProvid
             <Marker
               key={p.uid}
               position={[p.lat, p.lng]}
-              icon={createEliteMarker(p.status, p.profileImage, isSOS)}
+              icon={createEliteMarker(p.status, p.profileImage, isSOS, p.name)}
               zIndexOffset={isSOS ? 2000 : (selectedPartner?.uid === p.uid ? 1000 : 0)}
             >
               <Popup offset={[0, -50]}>

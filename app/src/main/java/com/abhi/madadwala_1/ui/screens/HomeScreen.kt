@@ -3075,6 +3075,7 @@ fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNav
 
 }
 
+@Composable
 fun ProfileTabContent(
     name: String,
     phone: String,

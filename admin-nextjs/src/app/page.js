@@ -599,16 +599,22 @@ export default function AdminDashboard() {
                         <div className="space-y-2">
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Assigned Partner</p>
                             <div className="flex items-center gap-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                                <div className="w-10 h-10 bg-indigo-100 rounded-full overflow-hidden shrink-0 border-2 border-white">
-                                    <img src={sosAlert.bookingDetails.providerImage || 'https://via.placeholder.com/40'} className="w-full h-full object-cover" />
+                                <div className="w-10 h-10 bg-indigo-100 rounded-full overflow-hidden shrink-0 border-2 border-white flex items-center justify-center bg-gray-200">
+                                    {sosAlert.bookingDetails.providerImage ? (
+                                        <img src={sosAlert.bookingDetails.providerImage} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Users size={16} className="text-gray-400" />
+                                    )}
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-indigo-900 truncate">{sosAlert.bookingDetails.providerName}</p>
                                     <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">{sosAlert.bookingDetails.serviceName}</p>
                                 </div>
-                                <a href={`tel:${sosAlert.bookingDetails.providerPhone}`} className="ml-auto p-2 bg-white rounded-xl text-indigo-600 shadow-sm">
-                                    <Phone size={16} />
-                                </a>
+                                {sosAlert.bookingDetails.providerPhone && (
+                                    <a href={`tel:${sosAlert.bookingDetails.providerPhone}`} className="ml-auto p-2 bg-white rounded-xl text-indigo-600 shadow-sm hover:bg-indigo-50 transition-colors">
+                                        <Phone size={16} />
+                                    </a>
+                                )}
                         </div>
                     </div>
                     )}
