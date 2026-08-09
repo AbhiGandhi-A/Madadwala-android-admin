@@ -225,9 +225,6 @@ fun ChatTopBar(
             IconButton(onClick = { /* Call logic handled by caller */ }) {
                 Icon(Icons.Default.Call, contentDescription = "Call", tint = MadadwalaColors.Green)
             }
-            IconButton(onClick = { /* Menu logic */ }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.Gray)
-            }
         }
     }
 }
