@@ -235,10 +235,14 @@ class ProviderViewModel : ViewModel() {
         val user = (dashboardState.value as? ProviderDashboardState.Success)?.user ?: return
         viewModelScope.launch {
             try {
+                val commissionFromPartner = price * 0.15
+                val platformFeeFromCustomer = price * 0.05
                 val bid = BidRequest(
                     providerUid = user.uid,
                     providerName = user.name ?: "Partner",
-                    price = price
+                    price = price, // Job Value (e.g. 1000)
+                    commission = commissionFromPartner, // Partner deduction (150)
+                    totalPrice = price + platformFeeFromCustomer // Customer pay (1050)
                 )
                 val response = apiService.submitBid(requestId, bid)
                 if (response.isSuccessful) {

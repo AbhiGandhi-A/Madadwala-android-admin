@@ -175,6 +175,9 @@ interface ApiService {
     suspend fun getPerformanceReport(@Path("uid") uid: String): Response<PerformanceReportResponse>
 
     // Reviews
+    @GET("api/reviews/booking/{bookingId}")
+    suspend fun getReviewByBooking(@Path("bookingId") bookingId: String): Response<ReviewResponse>
+
     @POST("api/reviews")
     suspend fun submitReview(@Body review: ReviewRequest): Response<ReviewResponse>
 
@@ -397,13 +400,17 @@ data class BookingMessageResponse(
 data class BidRequest(
     val providerUid: String,
     val providerName: String,
-    val price: Double
+    val price: Double,
+    val commission: Double = 0.0,
+    val totalPrice: Double = 0.0
 )
 
 data class BidResponse(
     val providerUid: String,
     val providerName: String,
     val price: Double,
+    val commission: Double? = 0.0,
+    val totalPrice: Double? = 0.0,
     val createdAt: String
 )
 

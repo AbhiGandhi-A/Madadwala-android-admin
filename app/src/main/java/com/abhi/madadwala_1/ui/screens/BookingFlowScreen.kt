@@ -184,11 +184,16 @@ fun BookingFlowScreen(
                     4 -> {
                         val user = (authState as? AuthState.Authenticated)?.user
                         val referralDiscount = user?.pendingReferralDiscount ?: 0.0
-                        val finalPrice = (price - referralDiscount).coerceAtLeast(0.0)
+                        
+                        // Service Price + 5% Platform Fee
+                        val platformFee = price * 0.05
+                        val finalPrice = (price + platformFee - referralDiscount).coerceAtLeast(0.0)
                         
                         Step4(
                             service = serviceName, 
                             price = price, 
+                            gst = platformFee, // Reusing gst variable as platformFee for Step4 parameters consistency
+                            taxes = 0.0,
                             referralDiscount = referralDiscount,
                             address = fullAddress, 
                             time = selectedTime, 
@@ -209,7 +214,7 @@ fun BookingFlowScreen(
                                         val serviceNameBody = serviceName.toRequestBody("text/plain".toMediaTypeOrNull())
                                         val addressBody = fullAddress.toRequestBody("text/plain".toMediaTypeOrNull())
                                         val scheduledTimeBody = selectedTime.toRequestBody("text/plain".toMediaTypeOrNull())
-                                        val totalAmountBody = finalPrice.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                                        val totalAmountBody = String.format("%.2f", finalPrice).toRequestBody("text/plain".toMediaTypeOrNull())
                                         val latBody = userLat.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                                         val lngBody = userLng.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                                         
@@ -975,6 +980,8 @@ fun Step3(
 fun Step4(
     service: String,
     price: Double,
+    gst: Double = 0.0,
+    taxes: Double = 0.0,
     referralDiscount: Double = 0.0,
     address: String,
     time: String,
@@ -983,7 +990,7 @@ fun Step4(
     onEditStep: (Int) -> Unit,
     onConfirm: () -> Unit
 ) {
-    val finalPrice = (price - referralDiscount).coerceAtLeast(0.0)
+    val finalPrice = (price + gst + taxes - referralDiscount).coerceAtLeast(0.0)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1022,6 +1029,15 @@ fun Step4(
                     onEdit = { onEditStep(1) }
                 )
                 
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
+
+                SummaryRow(
+                    icon = Icons.Default.Receipt,
+                    label = "Platform Fee (5%)",
+                    value = "₹${String.format("%.2f", gst)}", // gst variable contains platformFee
+                    onEdit = { }
+                )
+
                 if (referralDiscount > 0) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                     SummaryRow(
@@ -1037,7 +1053,7 @@ fun Step4(
                 SummaryRow(
                     icon = Icons.Default.Payments,
                     label = "Total Amount",
-                    value = "₹$finalPrice",
+                    value = "₹${String.format("%.2f", finalPrice)}",
                     onEdit = { }
                 )
 

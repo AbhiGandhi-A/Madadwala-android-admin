@@ -211,7 +211,8 @@ object InvoiceGenerator {
             // booking's service + total. If itemized pricing is added to the API
             // later, replace this single-item list with the real items array.
             val totalDouble = booking.totalAmount.toDouble()
-            val items = listOf(Triple(booking.serviceName, 1, totalDouble))
+            val basePriceItem = totalDouble / 1.05
+            val items = listOf(Triple(booking.serviceName, 1, basePriceItem))
 
             textPaint.textAlign = Paint.Align.LEFT
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
@@ -237,6 +238,8 @@ object InvoiceGenerator {
             // ============================================================
             y += 15f
             val total = totalDouble
+            val basePrice = total / 1.05
+            val platformFees = total - basePrice
             val isPaid = booking.paymentStatus?.lowercase() == "paid" || booking.status.lowercase() == "done"
             val paidAmount = if (isPaid) total else 0.0
 
@@ -259,13 +262,13 @@ object InvoiceGenerator {
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             textPaint.textSize = 9.5f
             canvas.drawText("Subtotal", marginX + 10f, y + 38f, textPaint)
-            canvas.drawText("Platform Fee", marginX + 10f, y + 53f, textPaint)
+            canvas.drawText("Platform Fee (5%)", marginX + 10f, y + 53f, textPaint)
             canvas.drawText("Convenience Fee", marginX + 10f, y + 68f, textPaint)
 
             textPaint.textAlign = Paint.Align.RIGHT
             textPaint.color = darkText
-            canvas.drawText("\u20B9${formatAmount(total)}", 275f, y + 38f, textPaint)
-            canvas.drawText("\u20B90.00", 275f, y + 53f, textPaint)
+            canvas.drawText("\u20B9${formatAmount(basePrice)}", 275f, y + 38f, textPaint)
+            canvas.drawText("\u20B9${formatAmount(platformFees)}", 275f, y + 53f, textPaint)
             canvas.drawText("\u20B90.00", 275f, y + 68f, textPaint)
 
             paint.color = borderGray

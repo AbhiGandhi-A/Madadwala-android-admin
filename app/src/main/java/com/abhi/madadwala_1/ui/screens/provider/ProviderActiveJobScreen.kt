@@ -437,6 +437,12 @@ fun ProviderActiveJobScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                Text(
+                                    text = "Collect: ₹${booking?.totalAmount ?: "0.00"}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MadadwalaColors.GreenDark
+                                )
                             }
                             
                             IconButton(

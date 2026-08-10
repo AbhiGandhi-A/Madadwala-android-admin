@@ -2038,6 +2038,13 @@ fun BidItem(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    
+    // bid.price is the Job Value (₹1,000)
+    // bid.totalPrice is the customer pay amount (₹1,050)
+    val jobValue = bid.price
+    val platformFee = jobValue * 0.05
+    val totalCustomerPay = jobValue + platformFee
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -2051,7 +2058,48 @@ fun BidItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(bid.providerName, fontWeight = FontWeight.Bold, color = MadadwalaColors.Green)
                 Text("Requested: ${request.category}", style = MaterialTheme.typography.bodySmall)
-                Text("Price: ₹${bid.price}", fontWeight = FontWeight.Black, color = MadadwalaColors.Green, fontSize = 18.sp)
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        text = "Service Price",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = "₹${String.format("%.2f", jobValue)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        text = "Platform Fee (5%)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = "₹${String.format("%.2f", platformFee)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color.LightGray.copy(alpha = 0.5f))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        text = "Total Payable", 
+                        fontWeight = FontWeight.Black, 
+                        color = MadadwalaColors.Green, 
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = "₹${String.format("%.2f", totalCustomerPay)}", 
+                        fontWeight = FontWeight.Black, 
+                        color = MadadwalaColors.Green, 
+                        fontSize = 18.sp
+                    )
+                }
             }
             Button(
                 onClick = {
@@ -2061,7 +2109,7 @@ fun BidItem(
                                 request._id,
                                 mapOf(
                                     "providerUid" to bid.providerUid,
-                                    "price" to bid.price.toString(),
+                                    "price" to String.format("%.2f", totalCustomerPay),
                                     "providerName" to bid.providerName
                                 )
                             )
@@ -2080,8 +2128,6 @@ fun BidItem(
             }
         }
     }
-
-
 }
 
 @SuppressLint("MissingPermission")
@@ -2213,13 +2259,28 @@ fun CustomRequestDialog(
 
                         // Price Input Fields
                         AnimatedVisibility(visible = true) {
-                            if (isPriceRange) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    PriceField(value = minPrice, onValueChange = { minPrice = it }, label = "Min ₹", modifier = Modifier.weight(1f))
-                                    PriceField(value = maxPrice, onValueChange = { maxPrice = it }, label = "Max ₹", modifier = Modifier.weight(1f))
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (isPriceRange) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        PriceField(value = minPrice, onValueChange = { minPrice = it }, label = "Min ₹", modifier = Modifier.weight(1f))
+                                        PriceField(value = maxPrice, onValueChange = { maxPrice = it }, label = "Max ₹", modifier = Modifier.weight(1f))
+                                    }
+                                } else {
+                                    PriceField(value = minPrice, onValueChange = { minPrice = it }, label = "Price ₹", modifier = Modifier.fillMaxWidth())
                                 }
-                            } else {
-                                PriceField(value = minPrice, onValueChange = { minPrice = it }, label = "Price ₹", modifier = Modifier.fillMaxWidth())
+                                
+                                val minP = minPrice.toDoubleOrNull() ?: 0.0
+                                if (minP > 0) {
+                                    val gst = minP * 0.075
+                                    val tax = minP * 0.075
+                                    val total = minP + gst + tax
+                                    Text(
+                                        text = "Total Incl. GST & Tax (15%): ₹${String.format("%.2f", total)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MadadwalaColors.Green,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
@@ -2242,13 +2303,20 @@ fun CustomRequestDialog(
                             scope.launch {
                                 try {
                                     if (userLat != 0.0 && userLng != 0.0) {
+                                        val minP = minPrice.toDoubleOrNull()
+                                        val maxP = if (isPriceRange) maxPrice.toDoubleOrNull() else null
+                                        
+                                        // Calculate inclusive totals
+                                        val finalMin = if (minP != null) minP + (minP * 0.15) else null
+                                        val finalMax = if (maxP != null) maxP + (maxP * 0.15) else null
+
                                         val request = com.abhi.madadwala_1.data.remote.CustomRequest(
                                             customerUid = user.uid,
                                             customerName = user.name ?: "Customer",
                                             category = category,
                                             problem = problem,
-                                            minPrice = if (!isAutoPrice) minPrice.toDoubleOrNull() else null,
-                                            maxPrice = if (!isAutoPrice && isPriceRange) maxPrice.toDoubleOrNull() else null,
+                                            minPrice = if (!isAutoPrice) finalMin else null,
+                                            maxPrice = if (!isAutoPrice && isPriceRange) finalMax else null,
                                             isAutoPrice = isAutoPrice,
                                             lat = userLat,
                                             lng = userLng
@@ -2622,13 +2690,22 @@ fun BookingsTabContent(uid: String, onNavigate: (String) -> Unit, callViewModel:
                 items(filteredBookings) { booking ->
                     BookingCardV2(
                         booking = booking,
-                        onViewDetails = { onNavigate(Screen.BookingConfirmation.createRoute(booking._id)) },
+                        onViewDetails = { 
+                            if (booking.status == "done") {
+                                onNavigate(Screen.WorkCompleted.createRoute(booking._id))
+                            } else {
+                                onNavigate(Screen.BookingConfirmation.createRoute(booking._id))
+                            }
+                        },
                         onTrackPartner = { onNavigate(Screen.LiveTracking.createRoute(booking._id)) },
                         onRebook = {
                             onNavigate(Screen.BookingFlow.createRoute(booking.providerUid, booking.serviceName, booking.totalAmount))
                         },
                         onPay = {
                             onNavigate(Screen.Payment.createRoute(booking._id))
+                        },
+                        onRate = {
+                            onNavigate(Screen.RatingReview.createRoute(booking._id, booking.providerUid))
                         },
                         onChat = {
                             onChat(booking._id)
@@ -2650,6 +2727,7 @@ fun BookingCardV2(
     onTrackPartner: () -> Unit,
     onRebook: () -> Unit,
     onPay: () -> Unit,
+    onRate: () -> Unit,
     onChat: () -> Unit,
     callViewModel: CallViewModel
 ) {
@@ -2831,7 +2909,7 @@ fun BookingCardV2(
                     BookingActionItem(Icons.Default.History, "Rebook") { onRebook() }
                     if (booking.paymentStatus == "paid") {
                         VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
-                        BookingActionItem(Icons.Default.StarBorder, "Rate & Review") { /* Rate */ }
+                        BookingActionItem(Icons.Default.StarBorder, "Rate & Review") { onRate() }
                         VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray.copy(alpha = 0.5f))
                         BookingActionItem(Icons.Default.FileDownload, "Invoice") {
                             scope.launch {

@@ -27,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -89,6 +90,19 @@ fun ProviderDashboardScreen(
     val dashboardState by viewModel.dashboardState.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var subScreen by rememberSaveable { mutableStateOf<String?>(null) }
+    
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val headerBgColor = if (selectedTab == 0) {
+        when {
+            hour in 6..16 -> Color(0xFFFFFAEC)
+            hour in 17..19 -> Color(0xFFFFEBE3)
+            else -> Color(0xFF111827) // Dark Night
+        }
+    } else if (selectedTab == 1) Color.White else MadadwalaColors.Cream
+
+    val isNightMode = (hour !in 6..19) && selectedTab == 0
+    val topBarContentColor = if (isNightMode) Color.White else MadadwalaColors.Ink
+    val topBarSubColor = if (isNightMode) Color.White.copy(alpha = 0.7f) else MadadwalaColors.Gray
 
     BackHandler(enabled = selectedTab != 0 || subScreen != null) {
         if (subScreen != null) {
@@ -107,6 +121,7 @@ fun ProviderDashboardScreen(
     val scope = rememberCoroutineScope()
     val preferenceManager = remember { PreferenceManager(context) }
     val preferredOnlineStatus by preferenceManager.preferredOnlineStatus.collectAsState(initial = true)
+    val unreadNotificationsCount by preferenceManager.unreadNotificationsCount.collectAsState(initial = 0)
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Handle Online/Offline based on App Lifecycle
@@ -177,7 +192,7 @@ fun ProviderDashboardScreen(
             val user = (dashboardState as? ProviderDashboardState.Success)?.user ?: return@Scaffold
             Surface(
                 shadowElevation = 0.dp,
-                color = MadadwalaColors.Cream
+                color = headerBgColor
             ) {
                 TopAppBar(
                     title = {
@@ -189,9 +204,9 @@ fun ProviderDashboardScreen(
                                     2 -> stringResource(R.string.payouts_wallet)
                                     else -> stringResource(R.string.partner_profile)
                                 },
-                                style = (if (selectedTab == 1) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge).copy(
+                                style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Black, 
-                                    color = MadadwalaColors.Ink,
+                                    color = topBarContentColor,
                                     fontSize = if (selectedTab == 1 || selectedTab == 2) 22.sp else 18.sp,
                                     letterSpacing = (-0.5).sp
                                 ),
@@ -204,14 +219,14 @@ fun ProviderDashboardScreen(
                                         Icon(
                                             Icons.Default.LocationOn,
                                             contentDescription = null,
-                                            tint = MadadwalaColors.Green,
+                                            tint = if (isNightMode) Color(0xFF10B981) else MadadwalaColors.Green,
                                             modifier = Modifier.size(12.dp)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = address.ifEmpty { "Ankleshwar, India" },
+                                            text = address.ifEmpty { "Location not available" },
                                             style = MaterialTheme.typography.labelSmall.copy(
-                                                color = MadadwalaColors.Gray,
+                                                color = topBarSubColor,
                                                 fontWeight = FontWeight.Medium
                                             ),
                                             maxLines = 1,
@@ -254,21 +269,20 @@ fun ProviderDashboardScreen(
                         if (selectedTab == 0) {
                             Surface(
                                 modifier = Modifier.padding(end = 4.dp),
-                                shape = RoundedCornerShape(20.dp),
-                                color = if (isOnline) MadadwalaColors.Green.copy(alpha = 0.1f) else MadadwalaColors.LightGray.copy(alpha = 0.5f)
+                                shape = RoundedCornerShape(24.dp),
+                                color = if (isOnline) MadadwalaColors.Green.copy(alpha = 0.12f) else MadadwalaColors.LightGray.copy(alpha = 0.5f)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically, 
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = if (isOnline) stringResource(R.string.online) else stringResource(R.string.offline),
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = if (isOnline) MadadwalaColors.Green else MadadwalaColors.Gray,
-                                            fontSize = 10.sp
-                                        ),
-                                        modifier = Modifier.padding(start = 4.dp)
+                                            fontSize = 11.sp
+                                        )
                                     )
                                     Switch(
                                         checked = isOnline,
@@ -278,7 +292,7 @@ fun ProviderDashboardScreen(
                                                 preferenceManager.setPreferredOnlineStatus(online)
                                             }
                                         },
-                                        modifier = Modifier.scale(0.5f),
+                                        modifier = Modifier.scale(0.55f).padding(start = 0.dp),
                                         colors = SwitchDefaults.colors(
                                             checkedThumbColor = Color.White,
                                             checkedTrackColor = MadadwalaColors.Green,
@@ -292,12 +306,14 @@ fun ProviderDashboardScreen(
                         
                         BadgedBox(
                             badge = { 
-                                Badge(
-                                    containerColor = MadadwalaColors.Red,
-                                    modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
-                                ) { 
-                                    Text("3", fontSize = 10.sp, color = Color.White) 
-                                } 
+                                if (unreadNotificationsCount > 0) {
+                                    Badge(
+                                        containerColor = MadadwalaColors.Red,
+                                        modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
+                                    ) { 
+                                        Text(unreadNotificationsCount.toString(), fontSize = 10.sp, color = Color.White) 
+                                    }
+                                }
                             },
                             modifier = Modifier.padding(end = 4.dp)
                         ) {
@@ -305,7 +321,7 @@ fun ProviderDashboardScreen(
                                 Icon(
                                     Icons.Default.NotificationsNone, 
                                     contentDescription = "Notifications", 
-                                    tint = MadadwalaColors.Ink
+                                    tint = topBarContentColor
                                 )
                             }
                         }
@@ -313,7 +329,7 @@ fun ProviderDashboardScreen(
                         Box(
                             modifier = Modifier
                                 .padding(end = 16.dp)
-                                .size(36.dp)
+                                .size(42.dp)
                                 .clip(CircleShape)
                                 .background(MadadwalaColors.Ink)
                                 .clickable { selectedTab = 3 },
@@ -344,37 +360,37 @@ fun ProviderDashboardScreen(
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+            NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
                 val items = listOf(
-                    Triple(0, Icons.Default.GridView, stringResource(R.string.home)),
-                    Triple(1, Icons.Default.Assignment, stringResource(R.string.bookings)),
-                    Triple(2, Icons.Default.AccountBalanceWallet, stringResource(R.string.payouts)),
-                    Triple(3, Icons.Default.Person, stringResource(R.string.profile))
+                    Triple(0, if (selectedTab == 0) Icons.Default.GridView else Icons.Outlined.GridView, stringResource(R.string.home)),
+                    Triple(1, if (selectedTab == 1) Icons.Default.Assignment else Icons.Outlined.Assignment, stringResource(R.string.bookings)),
+                    Triple(2, if (selectedTab == 2) Icons.Default.AccountBalanceWallet else Icons.Outlined.AccountBalanceWallet, stringResource(R.string.payouts)),
+                    Triple(3, if (selectedTab == 3) Icons.Default.Person else Icons.Outlined.Person, stringResource(R.string.profile))
                 )
                 items.forEach { (index, icon, label) ->
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        icon = { Icon(icon, contentDescription = label) },
+                        icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(26.dp)) },
                         label = { 
                             Text(
                                 text = label, 
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (selectedTab == index) MadadwalaColors.Teal else MadadwalaColors.Gray
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium),
+                                color = if (selectedTab == index) Color(0xFF2E7D32) else Color.Gray
                             ) 
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MadadwalaColors.Teal,
-                            selectedTextColor = MadadwalaColors.Teal,
-                            unselectedIconColor = MadadwalaColors.Gray,
-                            unselectedTextColor = MadadwalaColors.Gray,
-                            indicatorColor = MadadwalaColors.Teal.copy(alpha = 0.1f)
+                            selectedIconColor = Color(0xFF2E7D32),
+                            selectedTextColor = Color(0xFF2E7D32),
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray,
+                            indicatorColor = Color(0xFF2E7D32).copy(alpha = 0.1f)
                         )
                     )
                 }
             }
         },
-        containerColor = MadadwalaColors.Cream
+        containerColor = if (selectedTab == 1) Color(0xFFFBFBFB) else MadadwalaColors.Cream
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val state = dashboardState) {
@@ -425,7 +441,8 @@ fun ProviderDashboardScreen(
                                 totalEarned = state.user.totalEarnings ?: 0.0,
                                 transactions = state.transactions,
                                 onRefresh = { viewModel.loadDashboardData(false) },
-                                onViewWithdrawalHistory = { selectedTab = 3; subScreen = "withdrawals" }
+                                onViewWithdrawalHistory = { selectedTab = 3; subScreen = "withdrawals" },
+                                onSupportClick = { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.HelpSupport.route) }
                             )
                             3 -> ProviderProfileTab(
                                 user = state.user,
@@ -438,7 +455,8 @@ fun ProviderDashboardScreen(
                                 onUpdateServicePrice = { id, price -> viewModel.updateServicePrice(id, price) },
                                 onAddService = { name, price -> viewModel.addService(name, price) },
                                 onUploadImage = { viewModel.uploadProfileImage(it, context) },
-                                onRefresh = { viewModel.loadDashboardData(false) }
+                                onRefresh = { viewModel.loadDashboardData(false) },
+                                onSupportClick = { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.HelpSupport.route) }
                             )
                         }
                     }
@@ -486,19 +504,171 @@ fun ProviderHomeTab(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             item {
+                val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
                 Box(modifier = Modifier.fillMaxWidth()) {
-                    // Helper Illustration in background
+                    // Time-based Sky Background
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = when {
+                                        hour in 6..16 -> listOf(
+                                            Color(0xFFFFFAEC),
+                                            Color(0xFFFFF1C1),
+                                            MadadwalaColors.Cream
+                                        )
+                                        hour in 17..19 -> listOf(
+                                            Color(0xFFFFEBE3),
+                                            Color(0xFFFFCCBC),
+                                            MadadwalaColors.Cream
+                                        )
+                                        else -> listOf(
+                                            Color(0xFF0F172A),
+                                            Color(0xFF1E293B),
+                                            MadadwalaColors.Cream
+                                        )
+                                    }
+                                )
+                            )
+                    ) {
+                        when {
+                            hour in 6..16 -> {
+                                // Simple Sun Illustration (Morning/Afternoon)
+                                Canvas(modifier = Modifier.size(120.dp).align(Alignment.Center).offset(x = (-20).dp, y = (-20).dp)) {
+                                    drawCircle(
+                                        color = Color(0xFFFFD54F).copy(alpha = 0.15f),
+                                        radius = size.minDimension / 1.1f
+                                    )
+                                    drawCircle(
+                                        color = Color(0xFFFFD54F).copy(alpha = 0.4f),
+                                        radius = size.minDimension / 1.6f
+                                    )
+                                }
+                            }
+                            hour in 17..19 -> {
+                                // Sunset Sun Illustration (Evening)
+                                Canvas(modifier = Modifier.size(160.dp).align(Alignment.Center).offset(x = 0.dp, y = 35.dp)) {
+                                    drawCircle(
+                                        color = Color(0xFFFFB74D).copy(alpha = 0.2f),
+                                        radius = size.minDimension / 0.9f
+                                    )
+                                    drawCircle(
+                                        color = Color(0xFFFFB74D).copy(alpha = 0.5f),
+                                        radius = size.minDimension / 1.4f
+                                    )
+                                }
+                                
+                                // Simple birds approximation
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val birdColor = Color(0xFF455A64).copy(alpha = 0.3f)
+                                    // Bird 1
+                                    drawArc(
+                                        color = birdColor,
+                                        startAngle = 200f,
+                                        sweepAngle = 140f,
+                                        useCenter = false,
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(100f, 60f),
+                                        size = androidx.compose.ui.geometry.Size(20f, 10f)
+                                    )
+                                    // Bird 2
+                                    drawArc(
+                                        color = birdColor,
+                                        startAngle = 200f,
+                                        sweepAngle = 140f,
+                                        useCenter = false,
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(140f, 80f),
+                                        size = androidx.compose.ui.geometry.Size(24f, 12f)
+                                    )
+                                }
+                            }
+                            else -> {
+                                // Night Illustration (Crescent Moon & Stars)
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    // Crescent Moon
+                                    val moonColor = Color(0xFFFDE68A)
+                                    drawCircle(
+                                        color = moonColor,
+                                        radius = 35f,
+                                        center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2.5f)
+                                    )
+                                    drawCircle(
+                                        color = Color(0xFF0F172A), // Same as background start color to create crescent
+                                        radius = 32f,
+                                        center = androidx.compose.ui.geometry.Offset(size.width / 2f + 12f, size.height / 2.5f - 8f)
+                                    )
+                                    
+                                    // Stars
+                                    val starColor = Color.White.copy(alpha = 0.6f)
+                                    val random = java.util.Random(42)
+                                    repeat(25) {
+                                        drawCircle(
+                                            color = starColor,
+                                            radius = random.nextFloat() * 2f + 0.5f,
+                                            center = androidx.compose.ui.geometry.Offset(
+                                                random.nextFloat() * size.width,
+                                                random.nextFloat() * (size.height * 0.7f)
+                                            )
+                                        )
+                                    }
+                                }
+                                
+                                // City Skyline approximation at bottom of background
+                                Canvas(modifier = Modifier.fillMaxWidth().height(80.dp).align(Alignment.BottomCenter)) {
+                                    val buildingColor = Color(0xFF1E293B).copy(alpha = 0.8f)
+                                    val windowColor = Color(0xFFFDE68A).copy(alpha = 0.4f)
+                                    
+                                    val widths = listOf(40f, 60f, 35f, 70f, 50f, 80f, 45f)
+                                    val heights = listOf(60f, 90f, 40f, 110f, 70f, 100f, 80f)
+                                    var currentX = 0f
+                                    
+                                    var idx = 0
+                                    while (currentX < size.width) {
+                                        val w = widths[idx % widths.size]
+                                        val h = heights[idx % heights.size]
+                                        drawRect(
+                                            color = buildingColor,
+                                            topLeft = androidx.compose.ui.geometry.Offset(currentX, size.height - h),
+                                            size = androidx.compose.ui.geometry.Size(w, h)
+                                        )
+                                        
+                                        // Some windows
+                                        if (h > 40f) {
+                                            drawRect(
+                                                color = windowColor,
+                                                topLeft = androidx.compose.ui.geometry.Offset(currentX + 5f, size.height - h + 10f),
+                                                size = androidx.compose.ui.geometry.Size(6f, 6f)
+                                            )
+                                            drawRect(
+                                                color = windowColor,
+                                                topLeft = androidx.compose.ui.geometry.Offset(currentX + w - 11f, size.height - h + 25f),
+                                                size = androidx.compose.ui.geometry.Size(6f, 6f)
+                                            )
+                                        }
+                                        
+                                        currentX += w + 2f
+                                        idx++
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Helper Illustration repositioned
                     AnimatedVisibility(
                         visible = visible,
                         enter = fadeIn(animationSpec = tween(1000)),
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .offset(x = 25.dp, y = (-20).dp)
+                            .offset(x = 10.dp, y = 10.dp)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.helper_person),
                             contentDescription = null,
-                            modifier = Modifier.size(190.dp),
+                            modifier = Modifier.size(200.dp),
                             contentScale = ContentScale.Fit
                         )
                     }
@@ -508,22 +678,22 @@ fun ProviderHomeTab(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 24.dp),
+                                .padding(horizontal = 20.dp, vertical = 32.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
                                 val greeting = when(hour) {
-                                    in 0..11 -> "Good Morning! ☀️"
+                                    in 6..11 -> "Good Morning! ☀️"
                                     in 12..16 -> "Good Afternoon! ☀️"
-                                    else -> "Good Evening! 🌙"
+                                    in 17..19 -> "Good Evening! 🌇"
+                                    else -> "Good Night! 🌙"
                                 }
                                 Text(
                                     text = greeting,
                                     style = MaterialTheme.typography.bodyLarge.copy(
-                                        color = MadadwalaColors.Gray,
-                                        fontWeight = FontWeight.Medium
+                                        color = if (hour !in 6..19) Color.White.copy(alpha = 0.8f) else MadadwalaColors.Gray,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 )
                                 val rawName = user.name
@@ -533,8 +703,8 @@ fun ProviderHomeTab(
                                     text = greetingName,
                                     style = MaterialTheme.typography.headlineMedium.copy(
                                         fontWeight = FontWeight.Black,
-                                        color = MadadwalaColors.Ink,
-                                        fontSize = 28.sp,
+                                        color = if (hour !in 6..19) Color.White else MadadwalaColors.Ink,
+                                        fontSize = 30.sp,
                                         letterSpacing = (-1).sp
                                     )
                                 )
@@ -542,14 +712,14 @@ fun ProviderHomeTab(
                                 Text(
                                     text = "Ready to help more customers today",
                                     style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MadadwalaColors.Gray,
+                                        color = if (hour !in 6..19) Color.White.copy(alpha = 0.6f) else MadadwalaColors.Gray,
                                         fontWeight = FontWeight.Medium
                                     )
                                 )
                             }
                             
                             // Reserved space for the image overlap to prevent text clashing
-                            Spacer(modifier = Modifier.width(110.dp))
+                            Spacer(modifier = Modifier.width(100.dp))
                         }
 
                         // Stat Cards Row
@@ -832,9 +1002,9 @@ fun ProviderBookingsTab(
             androidx.compose.foundation.lazy.LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = 12.dp),
                 contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
                     FilterChipV2(
@@ -853,7 +1023,7 @@ fun ProviderBookingsTab(
                         isSelected = selectedFilter == "Pending",
                         onClick = { selectedFilter = "Pending" },
                         icon = Icons.Default.HourglassEmpty,
-                        iconColor = Color(0xFFFBC02D)
+                        iconColor = Color(0xFFFF9800)
                     )
                 }
                 item {
@@ -919,7 +1089,7 @@ fun ProviderBookingsTab(
 }
 
 @Composable
-fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<TransactionResponse>, onRefresh: () -> Unit, onViewWithdrawalHistory: () -> Unit) {
+fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<TransactionResponse>, onRefresh: () -> Unit, onViewWithdrawalHistory: () -> Unit, onSupportClick: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
@@ -984,7 +1154,8 @@ fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<
                     WalletQuickActionItem(
                         icon = Icons.Default.HeadsetMic,
                         title = "Support",
-                        subtitle = "Get help with\npayouts"
+                        subtitle = "Get help with\npayouts",
+                        onClick = onSupportClick
                     )
                 }
             }
@@ -1058,17 +1229,24 @@ fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<
     if (showWithdrawDialog) {
         AlertDialog(
             onDismissRequest = { if (!isSubmitting) showWithdrawDialog = false },
-            title = { Text("Withdraw Money", fontWeight = FontWeight.Bold) },
+            containerColor = Color.White,
+            title = { Text("Withdraw Money", fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Maximum available: ₹$balance", style = MaterialTheme.typography.bodySmall)
+                    Text("Maximum available: ₹$balance", style = MaterialTheme.typography.bodySmall, color = MadadwalaColors.Gray)
                     OutlinedTextField(
                         value = withdrawAmount,
                         onValueChange = { if (it.all { char -> char.isDigit() }) withdrawAmount = it },
                         label = { Text("Enter Amount") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        prefix = { Text("₹") }
+                        prefix = { Text("₹", color = MadadwalaColors.Ink) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MadadwalaColors.Ink,
+                            unfocusedTextColor = MadadwalaColors.Ink,
+                            focusedBorderColor = MadadwalaColors.Teal,
+                            unfocusedBorderColor = Color.LightGray
+                        )
                     )
                     Text("Note: It takes 3-4 hours to credit in your account.", fontSize = 12.sp, color = MadadwalaColors.Gray)
                 }
@@ -1109,15 +1287,25 @@ fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<
                         }
                     },
                     enabled = !isSubmitting && withdrawAmount.isNotEmpty(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MadadwalaColors.Teal,
+                        contentColor = Color.White,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = Color.Gray
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     if (isSubmitting) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                    else Text("Request Withdrawal")
+                    else Text("Request Withdrawal", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showWithdrawDialog = false }, enabled = !isSubmitting) {
-                    Text("Cancel")
+                TextButton(
+                    onClick = { showWithdrawDialog = false }, 
+                    enabled = !isSubmitting,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MadadwalaColors.Red)
+                ) {
+                    Text("Cancel", fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -1137,7 +1325,8 @@ fun ProviderProfileTab(
     onUpdateServicePrice: (String, Double) -> Unit,
     onAddService: (String, Double) -> Unit,
     onUploadImage: (Uri) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onSupportClick: () -> Unit
 ) {
     var legalContentType by rememberSaveable { mutableStateOf<String?>(null) }
     
@@ -1396,7 +1585,8 @@ fun ProviderProfileTab(
                                 ProfileOptionV2(
                                     label = stringResource(R.string.help_support),
                                     subtext = "Get help and contact support",
-                                    icon = Icons.Default.SupportAgent
+                                    icon = Icons.Default.SupportAgent,
+                                    onClick = onSupportClick
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                                 ProfileOptionV2(
@@ -1792,10 +1982,22 @@ fun KycSubScreen(user: UserResponse, onBack: () -> Unit) {
 fun BankDetailsSubScreen(uid: String, initialDetails: BankDetailsResponse?, onRefresh: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var accNo by remember { mutableStateOf(initialDetails?.accountNumber ?: "") }
-    var reAccNo by remember { mutableStateOf(initialDetails?.accountNumber ?: "") }
-    var ifsc by remember { mutableStateOf(initialDetails?.ifscCode ?: "") }
-    var holderName by remember { mutableStateOf(initialDetails?.accountHolderName ?: "") }
+    
+    var accNo by remember(initialDetails) { mutableStateOf(initialDetails?.accountNumber ?: "") }
+    var reAccNo by remember(initialDetails) { mutableStateOf(initialDetails?.accountNumber ?: "") }
+    var ifsc by remember(initialDetails) { mutableStateOf(initialDetails?.ifscCode ?: "") }
+    var holderName by remember(initialDetails) { mutableStateOf(initialDetails?.accountHolderName ?: "") }
+
+    var isSaving by remember { mutableStateOf(false) }
+
+    LaunchedEffect(initialDetails) {
+        if (initialDetails != null) {
+            accNo = initialDetails.accountNumber ?: ""
+            reAccNo = initialDetails.accountNumber ?: ""
+            ifsc = initialDetails.ifscCode ?: ""
+            holderName = initialDetails.accountHolderName ?: ""
+        }
+    }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1804,32 +2006,82 @@ fun BankDetailsSubScreen(uid: String, initialDetails: BankDetailsResponse?, onRe
         }
         Spacer(modifier = Modifier.height(24.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = accNo, onValueChange = { accNo = it }, label = { Text("Account Number") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = reAccNo, onValueChange = { reAccNo = it }, label = { Text("Re-enter Account Number") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = ifsc, onValueChange = { ifsc = it }, label = { Text("IFSC Code") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = holderName, onValueChange = { holderName = it }, label = { Text("Account Holder Name") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = accNo, 
+                onValueChange = { accNo = it }, 
+                label = { Text("Account Number") }, 
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+            )
+            OutlinedTextField(
+                value = reAccNo, 
+                onValueChange = { reAccNo = it }, 
+                label = { Text("Re-enter Account Number") }, 
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+            )
+            OutlinedTextField(
+                value = ifsc, 
+                onValueChange = { ifsc = it.uppercase() }, 
+                label = { Text("IFSC Code") }, 
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = holderName, 
+                onValueChange = { holderName = it }, 
+                label = { Text("Account Holder Name") }, 
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
             
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = {
-                    if (accNo == reAccNo && accNo.isNotEmpty()) {
-                        scope.launch {
-                            try {
-                                val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.updateBankDetails(uid, mapOf("accountNumber" to accNo, "ifscCode" to ifsc, "accountHolderName" to holderName))
-                                if (res.isSuccessful) {
-                                    onRefresh()
-                                    Toast.makeText(context, "Saved Successfully", Toast.LENGTH_SHORT).show()
-                                    onBack()
-                                }
-                            } catch (e: Exception) {}
+                    if (accNo != reAccNo) {
+                        Toast.makeText(context, "Account numbers do not match", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (accNo.isEmpty() || ifsc.isEmpty() || holderName.isEmpty()) {
+                        Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    
+                    scope.launch {
+                        isSaving = true
+                        try {
+                            val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.updateBankDetails(
+                                uid, 
+                                mapOf(
+                                    "accountNumber" to accNo, 
+                                    "ifscCode" to ifsc, 
+                                    "accountHolderName" to holderName
+                                )
+                            )
+                            if (res.isSuccessful) {
+                                onRefresh()
+                                Toast.makeText(context, "Saved Successfully", Toast.LENGTH_SHORT).show()
+                                delay(500) // Small delay to allow state refresh
+                                onBack()
+                            } else {
+                                Toast.makeText(context, "Failed to save: ${res.message()}", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            isSaving = false
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal)
+                colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal),
+                enabled = !isSaving
             ) {
-                Text("Save Details", fontWeight = FontWeight.Bold)
+                if (isSaving) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                else Text("Save Details", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -2221,15 +2473,14 @@ fun StatCard(
                 Spacer(modifier = Modifier.height(14.dp))
                 Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
                         .clickable { onClick() },
                     shape = RoundedCornerShape(10.dp),
                     color = MadadwalaColors.Green.copy(alpha = 0.05f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             buttonText,
@@ -2241,7 +2492,7 @@ fun StatCard(
                             Icons.Default.ChevronRight,
                             null,
                             tint = MadadwalaColors.Green,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(12.dp)
                         )
                     }
                 }
@@ -2660,6 +2911,20 @@ fun CustomRequestCard(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true
                 )
+                
+                val currentPrice = bidPrice.toDoubleOrNull() ?: 0.0
+                if (currentPrice > 0) {
+                    val finalPrice = currentPrice * 1.05
+
+                    Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Job Value", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MadadwalaColors.Ink)
+                        Text("₹${String.format("%.2f", currentPrice)}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MadadwalaColors.Ink)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Amount to Collect from Customer", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        Text("₹${String.format("%.2f", finalPrice)}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MadadwalaColors.GreenDark)
+                    }
+                }
                 Spacer(modifier = Modifier.height(12.dp))
             }
             
@@ -2706,11 +2971,11 @@ fun FilterChipV2(
         modifier = Modifier
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) MadadwalaColors.Ink else Color.White,
-        border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, MadadwalaColors.LightGray)
+        color = if (isSelected) Color(0xFF1A302A) else Color.White,
+        border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF0F0F0))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -2718,14 +2983,14 @@ fun FilterChipV2(
                 imageVector = icon,
                 contentDescription = null,
                 tint = if (isSelected) Color.White else iconColor,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "$label ($count)",
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    color = if (isSelected) Color.White else MadadwalaColors.Ink,
+                    color = if (isSelected) Color.White else Color(0xFF1A1A1A),
                     fontSize = 12.sp
                 )
             )
@@ -2753,7 +3018,7 @@ fun ModernBookingCard(
     var rejectReason by remember { mutableStateOf("") }
 
     val statusColor = when {
-        isDone -> Color(0xFF2196F3)      // Blue
+        isDone -> Color(0xFF4CAF50)      // Green
         isArrived -> Color(0xFFFF9800)   // Orange
         isAccepted -> Color(0xFF4CAF50)  // Green
         isPending -> Color(0xFFFBC02D)   // Amber
@@ -2769,7 +3034,7 @@ fun ModernBookingCard(
             .padding(horizontal = 20.dp, vertical = 8.dp),
         shape = RoundedCornerShape(24.dp),
         color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MadadwalaColors.LightGray.copy(alpha = 0.5f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF0F0F0))
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -2780,7 +3045,7 @@ fun ModernBookingCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(56.dp)
                             .background(
                                 color = statusBgColor,
                                 shape = CircleShape
@@ -2789,16 +3054,15 @@ fun ModernBookingCard(
                     ) {
                         Icon(
                             imageVector = when {
+                                booking.serviceName.contains("Electrical", ignoreCase = true) -> Icons.Default.Bolt
+                                booking.serviceName.contains("Light", ignoreCase = true) -> Icons.Default.Lightbulb
                                 isDone -> Icons.Default.CheckCircle
-                                isArrived -> Icons.Default.LocationOn
-                                isAccepted -> Icons.Default.CheckCircle
-                                isPending -> Icons.Default.HourglassEmpty
-                                isCancelled -> Icons.Default.Cancel
+                                isArrived -> Icons.Default.Bolt
                                 else -> Icons.Default.Info
                             },
                             contentDescription = null,
                             tint = statusColor,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
@@ -2807,7 +3071,7 @@ fun ModernBookingCard(
                             text = booking.customerName ?: "Customer",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = MadadwalaColors.Ink,
+                                color = Color(0xFF1A1A1A),
                                 fontSize = 18.sp
                             )
                         )
@@ -2815,7 +3079,8 @@ fun ModernBookingCard(
                             text = booking.serviceName,
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = Color(0xFF2E7D32),
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp
                             )
                         )
                     }
@@ -2827,11 +3092,7 @@ fun ModernBookingCard(
                         color = statusBgColor
                     ) {
                         Text(
-                            text = when(status) {
-                                "DONE" -> stringResource(R.string.status_done)
-                                "PENDING" -> stringResource(R.string.status_pending)
-                                else -> status
-                            },
+                            text = status,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.ExtraBold,
@@ -2846,7 +3107,7 @@ fun ModernBookingCard(
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Black,
                             color = if (isPaid) Color(0xFF4CAF50) else Color(0xFFDC4A3E),
-                            fontSize = 11.sp
+                            fontSize = 12.sp
                         )
                     )
                 }
@@ -2859,35 +3120,33 @@ fun ModernBookingCard(
                     Icon(
                         Icons.Default.AccessTime,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MadadwalaColors.Gray
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.Gray
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = booking.scheduledTime,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MadadwalaColors.Gray)
+                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.LocationOn,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MadadwalaColors.Gray
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.Gray
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = booking.address,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MadadwalaColors.Gray),
+                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-            HorizontalDivider(color = MadadwalaColors.LightGray.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -2897,66 +3156,62 @@ fun ModernBookingCard(
                 Column {
                     Text(
                         text = "Booking ID",
-                        style = MaterialTheme.typography.labelSmall.copy(color = MadadwalaColors.Gray)
+                        style = MaterialTheme.typography.labelSmall.copy(color = Color.Gray, fontSize = 11.sp)
                     )
                     Text(
                         text = "#${booking._id.takeLast(8).uppercase()}",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black)
                     )
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isPending) {
-                        IconButton(
-                            onClick = { showRejectDialog = true },
-                            modifier = Modifier
-                                .size(44.dp)
-                                .background(MadadwalaColors.Red.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Reject", tint = MadadwalaColors.Red, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                    }
-
                     if (!isDone && !isCancelled) {
-                        IconButton(
-                            onClick = onChat,
+                        Surface(
                             modifier = Modifier
-                                .size(44.dp)
-                                .background(MadadwalaColors.Green.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                                .size(48.dp)
+                                .clickable { onChat() },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF5F5F5)
                         ) {
-                            Icon(Icons.Default.Chat, contentDescription = "Chat", tint = MadadwalaColors.Green, modifier = Modifier.size(20.dp))
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.ChatBubbleOutline,
+                                    contentDescription = "Chat",
+                                    tint = Color(0xFF2E7D32),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                     
                     Button(
                         onClick = onViewDetails,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isDone) Color.White else Color(0xFF1B3C2D)
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    border = if (isDone) androidx.compose.foundation.BorderStroke(1.dp, MadadwalaColors.LightGray) else null,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (isDone) "View Summary" else "View Details",
-                            color = if (isDone) MadadwalaColors.Ink else Color.White,
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (isDone) MadadwalaColors.Ink else Color.White
-                        )
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isDone) Color.White else Color(0xFF1B3C2D)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        border = if (isDone) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0)) else null,
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (isDone) "View Summary" else "View Details",
+                                color = if (isDone) Color.Black else Color.White,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (isDone) Color.Black else Color.White
+                            )
+                        }
                     }
                 }
             }
         }
-    }
     }
 
     if (showRejectDialog) {
@@ -3093,6 +3348,20 @@ fun CustomJobRequestNotification(request: CustomRequestResponse, onAccept: (Doub
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true
                 )
+                
+                val currentPrice = bidPrice.toDoubleOrNull() ?: 0.0
+                if (currentPrice > 0) {
+                    val finalPrice = currentPrice * 1.05
+
+                    Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Job Value", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MadadwalaColors.Ink)
+                        Text("₹${String.format("%.2f", currentPrice)}", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MadadwalaColors.Ink)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Amount to Collect from Customer", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        Text("₹${String.format("%.2f", finalPrice)}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MadadwalaColors.GreenDark)
+                    }
+                }
                 Spacer(modifier = Modifier.height(32.dp))
             }
             

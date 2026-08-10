@@ -19,6 +19,7 @@ export const adminApi = {
   toggleBlock: (uid) => api.patch(`/admin/users/${uid}/toggle-block`),
   approveProvider: (uid) => api.post('/admin/approve-provider', { uid }),
   getPendingWithdrawals: () => api.get('/admin/withdrawals/pending'),
+  getAllWithdrawals: () => api.get('/admin/withdrawals/all'),
   updateWithdrawal: (id, data) => api.patch(`/admin/withdrawals/${id}`, data),
   getActiveJobs: () => api.get('/admin/active-jobs'),
   getAllBookings: () => api.get('/admin/all-bookings'),

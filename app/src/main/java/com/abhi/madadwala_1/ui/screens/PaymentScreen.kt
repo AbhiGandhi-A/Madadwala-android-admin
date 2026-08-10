@@ -335,20 +335,22 @@ fun PaymentScreen(
                                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally), color = MadadwalaColors.Green)
                             } else {
                                 val total = booking?.totalAmount ?: 0.0
+                                val baseCharge = total / 1.05
+                                val platformFee = total - baseCharge
                                 var couponMessage by remember { mutableStateOf<String?>(null) }
                                 var isValidatingCoupon by remember { mutableStateOf(false) }
 
-                                BillRowV2("Base Charge", "₹${String.format("%.2f", total * 0.9)}")
+                                BillRowV2("Base Charge", "₹${String.format("%.2f", baseCharge)}")
                                 BillRowV2("Extra Work", "₹0.00")
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Taxes & Fees", style = MaterialTheme.typography.bodyMedium, color = MadadwalaColors.Gray)
+                                    Text("Platform Fee (5%)", style = MaterialTheme.typography.bodyMedium, color = MadadwalaColors.Gray)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(Icons.Default.Info, contentDescription = null, tint = MadadwalaColors.Gray, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.weight(1f))
-                                    Text("₹${String.format("%.2f", total * 0.1)}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    Text("₹${String.format("%.2f", platformFee)}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                                 }
                                 
                                 if (isCouponApplied) {

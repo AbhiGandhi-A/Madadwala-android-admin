@@ -377,7 +377,7 @@ export default function AdminDashboard() {
         case 'providers-pending': res = await adminApi.getPendingProviders(); setData(p => ({...p, pendingProviders: res.data})); break;
         case 'customers': res = await adminApi.getAllUsers(); setData(p => ({...p, allUsers: res.data})); break;
         case 'providers-all': res = await adminApi.getAllProviders(); setData(p => ({...p, allProviders: res.data})); break;
-        case 'withdrawals': res = await adminApi.getPendingWithdrawals(); setData(p => ({...p, withdrawals: res.data})); break;
+        case 'withdrawals': res = await adminApi.getAllWithdrawals(); setData(p => ({...p, withdrawals: res.data})); break;
         case 'jobs': res = await adminApi.getActiveJobs(); setData(p => ({...p, activeJobs: res.data})); break;
         case 'bookings-all': res = await adminApi.getAllBookings(); setData(p => ({...p, allBookings: res.data})); break;
         case 'categories': res = await adminApi.getCategories(); setData(p => ({...p, categories: res.data})); break;
@@ -510,7 +510,7 @@ export default function AdminDashboard() {
               {activeTab === 'customers' && <UsersTable users={data.allUsers} onWarn={(u)=>openAction('warning', u)} onWallet={(u)=>openAction('wallet', u)} onDelete={(u)=>openAction('delete', u)} onBlock={(u)=>adminApi.toggleBlock(u.uid).then(()=>{fetchTabData('customers'); showToast("Updated");})} onDetails={(u)=>openAction('details', u)} title="Customers" />}
               {activeTab === 'providers-all' && <UsersTable users={data.allProviders} onWarn={(u)=>openAction('warning', u)} onWallet={(u)=>openAction('wallet', u)} onDelete={(u)=>openAction('delete', u)} onBlock={(u)=>adminApi.toggleBlock(u.uid).then(()=>{fetchTabData('providers-all'); showToast("Updated");})} onDetails={(u)=>openAction('details', u)} title="Partners" isPartner />}
               {activeTab === 'providers-pending' && <PendingView providers={data.pendingProviders} onApprove={(uid)=>adminApi.approveProvider(uid).then(()=>{fetchTabData('providers-pending'); showToast("Approved");})} onReject={(u)=>openAction('reject-kyc', u)} onViewKyc={(u)=>openAction('kyc-viewer', u)} />}
-              {activeTab === 'withdrawals' && <WithdrawalsTable withdrawals={data.withdrawals} onHandle={(id, s)=>adminApi.updateWithdrawal(id, {status:s}).then(()=>{fetchTabData('withdrawals'); showToast("Processed");})} />}
+              {activeTab === 'withdrawals' && <WithdrawalsTable withdrawals={data.withdrawals} onHandle={(id, s, reason)=>adminApi.updateWithdrawal(id, {status:s, rejectionReason: reason}).then(()=>{fetchTabData('withdrawals'); showToast("Processed");})} />}
               {activeTab === 'jobs' && <JobsTable jobs={data.activeJobs} title="Active jobs" onView={(j)=>openAction('booking-detail', j)} />}
               {activeTab === 'bookings-all' && <JobsTable jobs={data.allBookings} title="Booking history" onView={(j)=>openAction('booking-detail', j)} />}
               {activeTab === 'categories' && <CategoriesView categories={data.categories} refresh={()=>fetchTabData('categories')} />}
@@ -1192,36 +1192,104 @@ const PendingView = ({ providers, onApprove, onReject, onViewKyc }) => (
 );
 
 /* ---------- Withdrawals ---------- */
-const WithdrawalsTable = ({ withdrawals, onHandle }) => (
-  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
-    <div className="px-6 py-4 border-b border-gray-100 font-semibold text-gray-900 text-[14px]">Withdrawal requests</div>
-    <div className="overflow-x-auto">
-      <table className="w-full text-left">
-        <thead>
-          <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
-            <th className="px-6 py-3">Partner</th>
-            <th className="px-6 py-3 text-right">Amount &amp; action</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {withdrawals.length === 0 ? (
-            <tr><td colSpan="2" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">No pending requests</td></tr>
-          ) : (
-            withdrawals.map(w => (
-              <tr key={w._id} className="hover:bg-gray-50/60 transition-colors">
-                <td className="px-6 py-5 font-semibold text-gray-900 text-[15px]">{w.providerName}</td>
-                <td className="px-6 py-5 text-right space-x-5">
-                  <span className="text-indigo-600 font-bold text-xl">₹{w.amount}</span>
-                  <button onClick={()=>onHandle(w._id, 'approved')} className="px-5 py-2 bg-gray-900 text-white text-[12px] font-semibold rounded-lg hover:bg-indigo-600 active:scale-95 transition-all">Approve payout</button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+const WithdrawalsTable = ({ withdrawals, onHandle }) => {
+  const [filter, setFilter] = React.useState('pending');
+  const filtered = withdrawals.filter(w => filter === 'all' ? true : w.status === filter);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+      <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
+        <h3 className="font-semibold text-gray-900 text-[14px]">Withdrawal requests</h3>
+        <div className="flex bg-gray-100 p-1 rounded-lg">
+          {['pending', 'paid', 'rejected', 'all'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${filter === f ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+              <th className="px-6 py-3">Partner & Date</th>
+              <th className="px-6 py-3">Bank details</th>
+              <th className="px-6 py-3 text-center">Amount</th>
+              <th className="px-6 py-3 text-center">Status</th>
+              <th className="px-6 py-3 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filtered.length === 0 ? (
+              <tr><td colSpan="5" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">No {filter} requests found</td></tr>
+            ) : (
+              filtered.map(w => (
+                <tr key={w._id} className="hover:bg-gray-50/60 transition-colors">
+                  <td className="px-6 py-4">
+                    <p className="font-bold text-gray-900 text-[13.5px]">{w.providerName}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{new Date(w.createdAt).toLocaleDateString()} at {new Date(w.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-0.5">
+                      <p className="text-[12.5px] font-medium text-gray-700">A/C: <span className="font-bold">{w.accountNumber}</span></p>
+                      <p className="text-[11px] text-gray-500 font-medium">IFSC: {w.ifscCode} • {w.holderName}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-gray-900 font-black text-lg">₹{w.amount}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                      w.status === 'paid' ? 'bg-emerald-50 text-emerald-600' :
+                      w.status === 'pending' ? 'bg-amber-50 text-amber-600' :
+                      w.status === 'rejected' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      {w.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {w.status === 'pending' ? (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Reject withdrawal request of ₹${w.amount} for ${w.providerName}?`)) {
+                              const reason = window.prompt("Reason for rejection:");
+                              if (reason) onHandle(w._id, 'rejected', reason);
+                            }
+                          }}
+                          className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                          title="Reject"
+                        >
+                          <X size={16} strokeWidth={2.5} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Approve and process payout of ₹${w.amount} to ${w.providerName}?`)) {
+                              onHandle(w._id, 'approved');
+                            }
+                          }}
+                          className="px-4 py-2 bg-gray-900 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg hover:bg-indigo-600 active:scale-95 transition-all shadow-md shadow-gray-200"
+                        >
+                          Approve
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] font-bold text-gray-300 uppercase italic">Processed</div>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ---------- Jobs / bookings ---------- */
 const JobsTable = ({ jobs, title, onView }) => (

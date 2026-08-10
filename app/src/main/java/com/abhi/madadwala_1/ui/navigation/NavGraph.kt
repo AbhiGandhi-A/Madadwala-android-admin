@@ -22,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.abhi.madadwala_1.utils.AnalyticsHelper
+import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -55,6 +56,9 @@ sealed class Screen(val route: String) {
     }
     object BookingConfirmation : Screen("booking_confirmation/{bookingId}") {
         fun createRoute(bookingId: String) = "booking_confirmation/$bookingId"
+    }
+    object WorkCompleted : Screen("work_completed/{bookingId}") {
+        fun createRoute(bookingId: String) = "work_completed/$bookingId"
     }
     object LiveTracking : Screen("live_tracking/{bookingId}") {
         fun createRoute(bookingId: String) = "live_tracking/$bookingId"
@@ -430,9 +434,36 @@ fun NavGraph(navController: NavHostController) {
                 onTrackLive = { id ->
                     navController.navigate(Screen.LiveTracking.createRoute(id))
                 },
+                onWorkCompleted = { id ->
+                    navController.navigate(Screen.WorkCompleted.createRoute(id)) {
+                        popUpTo(Screen.BookingConfirmation.route) { inclusive = true }
+                    }
+                },
                 onHome = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.WorkCompleted.route) { backStackEntry ->
+            val bookingId = backStackEntry.arguments?.getString("bookingId") ?: ""
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            WorkCompletedScreen(
+                bookingId = bookingId,
+                onHome = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
+                onRate = { bId, pUid ->
+                    navController.navigate(Screen.RatingReview.createRoute(bId, pUid))
+                },
+                onInvoice = { booking ->
+                    scope.launch {
+                        com.abhi.madadwala_1.utils.InvoiceGenerator.generateInvoice(context, booking)
                     }
                 }
             )

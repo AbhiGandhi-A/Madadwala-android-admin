@@ -40,6 +40,7 @@ import java.util.*
 fun BookingConfirmationScreen(
     bookingId: String,
     onTrackLive: (String) -> Unit,
+    onWorkCompleted: (String) -> Unit,
     onHome: () -> Unit,
     callViewModel: CallViewModel = viewModel(
         viewModelStoreOwner = androidx.compose.ui.platform.LocalContext.current as androidx.activity.ComponentActivity
@@ -56,6 +57,10 @@ fun BookingConfirmationScreen(
                 val response = RetrofitClient.apiService.getBookingDetails(bookingId)
                 if (response.isSuccessful) {
                     val b = response.body()
+                    if (b?.status == "done") {
+                        onWorkCompleted(bookingId)
+                        return@launch
+                    }
                     booking = b
                     
                     // Fetch provider details to show real name, image, and rating
