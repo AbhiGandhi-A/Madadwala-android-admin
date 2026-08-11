@@ -78,7 +78,7 @@ fun LiveTrackingScreen(
     }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
-    
+
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(21.6264, 73.0152), 15f)
     }
@@ -88,15 +88,15 @@ fun LiveTrackingScreen(
         SocketHandler.setSocket("https://madadwala-backend.onrender.com")
         SocketHandler.establishConnection()
         val socket = SocketHandler.getSocket()
-        
+
         socket?.on(io.socket.client.Socket.EVENT_CONNECT) {
             socket.emit("join_booking", bookingId)
         }
-        
+
         if (socket?.connected() == true) {
             socket.emit("join_booking", bookingId)
         }
-        
+
         socket?.on("location_update") { args ->
             android.util.Log.d("Madadwala", "Socket location_update received")
             if (args.isNotEmpty()) {
@@ -105,9 +105,9 @@ fun LiveTrackingScreen(
                 val lng = data.getDouble("lng")
                 android.util.Log.d("Madadwala", "New Partner Location: $lat, $lng")
                 val newLoc = LatLng(lat, lng)
-                
+
                 partnerLocation = newLoc
-                
+
                 if (!cameraPositionState.isMoving) {
                     scope.launch {
                         cameraPositionState.animate(
@@ -127,7 +127,7 @@ fun LiveTrackingScreen(
                 val response = RetrofitClient.trackingApiService.getBookingDetails(bookingId)
                 if (response.isSuccessful) {
                     val b = response.body()
-                    
+
                     // Show notification when provider has arrived
                     if (b?.otp != null && b.status == "arrived" && b.otp != lastKnownOtp) {
                         NotificationHelper(context).showNotification(
@@ -138,7 +138,7 @@ fun LiveTrackingScreen(
                     }
 
                     booking = b
-                    
+
                     if (b?.status == "done") {
                         onComplete(bookingId)
                     }
@@ -154,21 +154,21 @@ fun LiveTrackingScreen(
 
                     val pLat = partnerLocation?.latitude ?: b?.providerLat
                     val pLng = partnerLocation?.longitude ?: b?.providerLng
-                    
+
                     // Check for valid coordinates (not 0.0)
                     if (pLat != null && pLng != null && pLat != 0.0 && b?.customerLat != null && b?.customerLat != 0.0) {
                         val origin = "$pLat,$pLng"
                         val destination = "${b.customerLat},${b.customerLng}"
-                        
+
                         val directionsResponse = try {
                             RetrofitClient.mapsApiService.getDirections(
                                 origin = origin,
                                 destination = destination,
                                 apiKey = "AIzaSyCmBUpQgoSWPSXcC0DpxilJzJGTXJtke-8"
                             )
-                        } catch (e: Exception) { 
+                        } catch (e: Exception) {
                             android.util.Log.e("Madadwala", "Directions error", e)
-                            null 
+                            null
                         }
 
                         if (directionsResponse != null && directionsResponse.isSuccessful && directionsResponse.body()?.status == "OK") {
@@ -283,7 +283,7 @@ fun LiveTrackingScreen(
                                 }
                             }
                         }
-                        
+
                         // Time overlay on map
                         Surface(
                             modifier = Modifier.align(Alignment.Center).padding(bottom = 40.dp),
@@ -332,7 +332,7 @@ fun LiveTrackingScreen(
                                     color = MadadwalaColors.Gray
                                 )
                             }
-                            
+
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = Color(0xFFFFF7ED), // Light orange background
@@ -356,18 +356,18 @@ fun LiveTrackingScreen(
                                             durationText.split(" ")[0]
                                         }
                                     }
-                                    
+
                                     val unitText = remember(durationText) {
                                         if (durationText.contains("hour")) ""
-                                        else if (durationText.contains("min")) "min" 
-                                        else if (durationText.contains("km")) "km" 
+                                        else if (durationText.contains("min")) "min"
+                                        else if (durationText.contains("km")) "km"
                                         else ""
                                     }
 
                                     Text(
                                         text = displayTime,
                                         style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Bold, 
+                                            fontWeight = FontWeight.Bold,
                                             color = Color(0xFFF59E0B),
                                             fontSize = if (displayTime.length > 3) 16.sp else 20.sp
                                         ),
@@ -466,7 +466,7 @@ fun LiveTrackingScreen(
                                         }
                                     }
                                 )
-                                
+
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF3F4F6))
 
                                 DetailItem(
@@ -542,7 +542,7 @@ fun LiveTrackingScreen(
                                 }
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.height(80.dp)) // Extra space for floating button
                     }
                 }
@@ -585,22 +585,22 @@ fun OrderDetailsSheetContent(booking: BookingResponse, onDismiss: () -> Unit) {
             fontWeight = FontWeight.Bold,
             color = MadadwalaColors.Ink
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         DetailSheetItem("Order ID", "#${booking._id.uppercase()}", Icons.Default.Fingerprint)
         DetailSheetItem("Service", booking.serviceName, Icons.Default.Build)
         DetailSheetItem("Scheduled For", booking.scheduledTime.replace("|", "at"), Icons.Default.Event)
         DetailSheetItem("Address", booking.address, Icons.Default.LocationOn)
         DetailSheetItem("Total Amount", "₹${booking.totalAmount}", Icons.Default.Payments)
         DetailSheetItem("Payment Status", booking.paymentStatus?.replaceFirstChar { it.uppercase() } ?: "Pending", Icons.Default.Info)
-        
+
         if (!booking.partnerComment.isNullOrEmpty()) {
             DetailSheetItem("Notes", booking.partnerComment!!, Icons.Default.Notes)
         }
 
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         Button(
             onClick = onDismiss,
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -642,7 +642,7 @@ fun PartnerInfoCard(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    
+
     // Fallback logic for better data display
     val displayName = provider?.name ?: booking?.providerName ?: "Partner"
     val displayImage = provider?.profileImage ?: booking?.providerImage
@@ -681,9 +681,9 @@ fun PartnerInfoCard(
                     Icon(Icons.Default.Person, contentDescription = null, tint = MadadwalaColors.Green, modifier = Modifier.size(30.dp))
                 }
             }
-            
+
             Spacer(modifier = Modifier.width(12.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = displayName,
@@ -762,7 +762,7 @@ fun TrackingProgressBar(currentStep: Int) {
             thickness = 2.dp,
             color = Color(0xFFE5E7EB)
         )
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -823,7 +823,7 @@ fun DetailItem(
             Text(text = title, fontSize = 12.sp, color = MadadwalaColors.Gray)
             Text(text = subtitle, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink)
         }
-        
+
         Column(horizontalAlignment = Alignment.End) {
             if (extraInfo != null) {
                 Text(text = extraInfo, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = extraInfoColor)

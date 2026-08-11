@@ -5,9 +5,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.*
 import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.abhi.madadwala_1.MainActivity
 import com.abhi.madadwala_1.R
 import com.abhi.madadwala_1.ui.viewmodel.IncomingCallActivity
@@ -98,16 +100,29 @@ class NotificationHelper(private val context: Context) {
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         }
 
+        // Determine Large Icon based on content (Simulating the UI in the image)
+        val largeIconRes = when {
+            title?.contains("Job", ignoreCase = true) == true -> R.drawable.app_logo
+            title?.contains("Payment", ignoreCase = true) == true -> R.drawable.app_logo
+            title?.contains("Rating", ignoreCase = true) == true || title?.contains("Great Job", ignoreCase = true) == true -> R.drawable.app_logo
+            title?.contains("Booking", ignoreCase = true) == true -> R.drawable.app_logo
+            else -> R.drawable.app_logo
+        }
+
         val notificationBuilder = NotificationCompat.Builder(context, if (isCall) CALL_CHANNEL_ID else CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setSubText("🔔") // Adds bell emoji next to app name "Madadwala"
             .setContentTitle(title)
             .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setLargeIcon(createStyledLargeIcon(largeIconRes))
             .setAutoCancel(true)
             .setSound(soundUri)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(if (isCall) NotificationCompat.CATEGORY_CALL else NotificationCompat.CATEGORY_MESSAGE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColor(ContextCompat.getColor(context, R.color.black)) // Standard dark background for notification
 
         if (isCall) {
             notificationBuilder.setFullScreenIntent(pendingIntent, true)
@@ -116,6 +131,28 @@ class NotificationHelper(private val context: Context) {
         }
 
         notificationManager.notify(if (isCall) CALL_NOTIFICATION_ID else System.currentTimeMillis().toInt(), notificationBuilder.build())
+    }
+
+    private fun createStyledLargeIcon(resourceId: Int): Bitmap {
+        val size = 128
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        
+        // Draw white rounded background
+        paint.color = Color.WHITE
+        val rectF = RectF(0f, 0f, size.toFloat(), size.toFloat())
+        canvas.drawRoundRect(rectF, 30f, 30f, paint)
+        
+        // Draw the icon centered
+        val icon = BitmapFactory.decodeResource(context.resources, resourceId)
+        if (icon != null) {
+            val padding = 25
+            val destRect = Rect(padding, padding, size - padding, size - padding)
+            canvas.drawBitmap(icon, null, destRect, null)
+        }
+        
+        return output
     }
 
     fun cancelCallNotification() {

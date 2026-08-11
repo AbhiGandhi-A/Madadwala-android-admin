@@ -125,20 +125,45 @@ fun ProviderDashboardScreen(
     val unreadNotificationsCount by preferenceManager.unreadNotificationsCount.collectAsState(initial = 0)
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Location Permission
+    val locationPermissionState = rememberPermissionState(
+        android.Manifest.permission.ACCESS_FINE_LOCATION
+    )
+
+    LaunchedEffect(locationPermissionState.status.isGranted) {
+        if (locationPermissionState.status.isGranted) {
+            while (true) {
+                locationViewModel.fetchLocation(context)
+                delay(30000) // Update every 30 seconds
+            }
+        } else {
+            locationPermissionState.launchPermissionRequest()
+        }
+    }
+
+    LaunchedEffect(lat, lng) {
+        if (lat != 0.0 && lng != 0.0) {
+            viewModel.updateLocation(lat, lng)
+        }
+    }
+
     var operationalCities by remember { mutableStateOf<List<String>>(emptyList()) }
     var isCityOperational by remember { mutableStateOf(false) }
     var cityCheckLoading by remember { mutableStateOf(true) }
     var isCitiesLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        try {
-            val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getOperationalCities()
-            if (res.isSuccessful) {
-                operationalCities = res.body()?.map { it.name } ?: emptyList()
-                isCitiesLoaded = true
+        while(true) {
+            try {
+                val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getOperationalCities()
+                if (res.isSuccessful) {
+                    operationalCities = res.body()?.map { it.name } ?: emptyList()
+                    isCitiesLoaded = true
+                }
+            } catch (_: Exception) {
+                if (!isCitiesLoaded) isCitiesLoaded = true
             }
-        } catch (_: Exception) {
-            isCitiesLoaded = true // Even on error, stop blocking
+            delay(10000) // Refresh every 10 seconds
         }
     }
 
@@ -148,14 +173,9 @@ fun ProviderDashboardScreen(
             return@LaunchedEffect
         }
 
-        if (address.isNotEmpty() && address != "Locating...") {
-            if (operationalCities.isEmpty()) {
-                // If no cities in admin dashboard, app is operational for EVERYONE (Initial phase)
-                isCityOperational = true
-            } else {
-                isCityOperational = operationalCities.any { city ->
-                    address.contains(city, ignoreCase = true)
-                }
+        if (address.isNotEmpty() && address != "Locating..." && address != "Fetching location...") {
+            isCityOperational = operationalCities.any { city ->
+                address.contains(city, ignoreCase = true)
             }
             cityCheckLoading = false
         } else {
@@ -176,6 +196,7 @@ fun ProviderDashboardScreen(
     if (!isCityOperational) {
         com.abhi.madadwala_1.ui.screens.ComingSoonScreen(
             cityName = address.split(",").firstOrNull()?.trim() ?: "Your City",
+            address = address,
             onNotifyMe = {
                 scope.launch {
                     try {
@@ -218,32 +239,6 @@ fun ProviderDashboardScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
-    // Location Permission
-    val locationPermissionState = rememberPermissionState(
-        android.Manifest.permission.ACCESS_FINE_LOCATION
-    )
-
-    LaunchedEffect(Unit) {
-        if (!locationPermissionState.status.isGranted) {
-            locationPermissionState.launchPermissionRequest()
-        }
-    }
-
-    LaunchedEffect(locationPermissionState.status.isGranted) {
-        if (locationPermissionState.status.isGranted) {
-            while (true) {
-                locationViewModel.fetchLocation(context)
-                delay(30000) // Update every 30 seconds
-            }
-        }
-    }
-
-    LaunchedEffect(lat, lng) {
-        if (lat != 0.0 && lng != 0.0) {
-            viewModel.updateLocation(lat, lng)
         }
     }
 
@@ -2931,12 +2926,12 @@ fun BookingCard(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal)
                 ) {
-                    Text("Confirm & Accept")
+                    Text("Confirm & Accept", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAcceptDialog = false }) {
-                    Text("Cancel")
+                    Text("Cancel", color = MadadwalaColors.Gray, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -2945,10 +2940,10 @@ fun BookingCard(
     if (showRejectDialog) {
         AlertDialog(
             onDismissRequest = { showRejectDialog = false },
-            title = { Text("Reject Booking", fontWeight = FontWeight.Bold) },
+            title = { Text("Reject Booking", fontWeight = FontWeight.Bold, color = MadadwalaColors.Ink) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Please provide a reason for rejecting this booking. This will be shared with the customer.")
+                    Text("Please provide a reason for rejecting this booking. This will be shared with the customer.", color = MadadwalaColors.Ink)
                     OutlinedTextField(
                         value = rejectReason,
                         onValueChange = { rejectReason = it },
@@ -2967,12 +2962,12 @@ fun BookingCard(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Red)
                 ) {
-                    Text("Confirm & Reject", color = Color.White)
+                    Text("Confirm & Reject", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRejectDialog = false }) {
-                    Text("Go Back")
+                    Text("Go Back", color = MadadwalaColors.Gray, fontWeight = FontWeight.Bold)
                 }
             }
         )

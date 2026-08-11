@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
@@ -27,8 +29,12 @@ class PreferenceManager(private val context: Context) {
         val PREFERRED_ONLINE_STATUS = booleanPreferencesKey("preferred_online_status")
         val NOTIFICATION_SOUND_ENABLED = booleanPreferencesKey("notification_sound_enabled")
         val APP_LANGUAGE = stringPreferencesKey("app_language")
-        val UNREAD_NOTIFICATIONS_COUNT = androidx.datastore.preferences.core.intPreferencesKey("unread_notifications_count")
+        val UNREAD_NOTIFICATIONS_COUNT = intPreferencesKey("unread_notifications_count")
         val SAVED_NOTIFICATIONS = stringPreferencesKey("saved_notifications")
+        val LAST_LATITUDE = doublePreferencesKey("last_latitude")
+        val LAST_LONGITUDE = doublePreferencesKey("last_longitude")
+        val LAST_ADDRESS = stringPreferencesKey("last_address")
+        val IS_MANUAL_LOCATION = booleanPreferencesKey("is_manual_location")
     }
 
     private val gson = Gson()
@@ -61,6 +67,22 @@ class PreferenceManager(private val context: Context) {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    val lastLatitude: Flow<Double?> = context.dataStore.data.map { preferences ->
+        preferences[LAST_LATITUDE]
+    }
+
+    val lastLongitude: Flow<Double?> = context.dataStore.data.map { preferences ->
+        preferences[LAST_LONGITUDE]
+    }
+
+    val lastAddress: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[LAST_ADDRESS]
+    }
+
+    val isManualLocation: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[IS_MANUAL_LOCATION] ?: false
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
@@ -127,6 +149,21 @@ class PreferenceManager(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[SAVED_NOTIFICATIONS] = "[]"
             preferences[UNREAD_NOTIFICATIONS_COUNT] = 0
+        }
+    }
+
+    suspend fun saveLocation(lat: Double, lng: Double, address: String, isManual: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_LATITUDE] = lat
+            preferences[LAST_LONGITUDE] = lng
+            preferences[LAST_ADDRESS] = address
+            preferences[IS_MANUAL_LOCATION] = isManual
+        }
+    }
+
+    suspend fun setManualLocation(isManual: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[IS_MANUAL_LOCATION] = isManual
         }
     }
 }

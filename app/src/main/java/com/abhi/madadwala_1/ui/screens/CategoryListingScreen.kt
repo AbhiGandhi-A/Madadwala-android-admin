@@ -289,11 +289,11 @@ fun CategoryListingScreen(
                     uid = user?.uid ?: "",
                     onDismiss = { showLocationPicker = false },
                     onLocationSelected = { lat: Double, lng: Double, name: String ->
-                        locationViewModel.setLocation(lat, lng, name)
+                        locationViewModel.setLocation(context, lat, lng, name)
                         showLocationPicker = false
                     },
                     onUseLiveLocation = {
-                        locationViewModel.fetchLocation(context)
+                        locationViewModel.fetchLocation(context, force = true)
                         showLocationPicker = false
                     }
                 )

@@ -129,6 +129,11 @@ fun HomeScreen(
     val userLng by locationViewModel.longitude.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        locationViewModel.init(context)
+    }
+
     val preferenceManager = remember { PreferenceManager(context) }
     val unreadCount by preferenceManager.unreadNotificationsCount.collectAsState(initial = 0)
 
@@ -338,13 +343,8 @@ fun HomeScreen(
         }
 
         if (address.isNotEmpty() && address != "Locating...") {
-            if (operationalCities.isEmpty()) {
-                // If no cities in admin dashboard, app is operational for EVERYONE (Dev/Initial phase)
-                isCityOperational = true
-            } else {
-                isCityOperational = operationalCities.any { city ->
-                    address.contains(city, ignoreCase = true)
-                }
+            isCityOperational = operationalCities.any { city ->
+                address.contains(city, ignoreCase = true)
             }
             cityCheckLoading = false
         } else {
@@ -397,11 +397,11 @@ fun HomeScreen(
                     uid = user?.uid ?: "",
                     onDismiss = { showLocationPicker = false },
                     onLocationSelected = { lat, lng, name ->
-                        locationViewModel.setLocation(lat, lng, name)
+                        locationViewModel.setLocation(context, lat, lng, name)
                         showLocationPicker = false
                     },
                     onUseLiveLocation = {
-                        locationViewModel.fetchLocation(context)
+                        locationViewModel.fetchLocation(context, force = true)
                         showLocationPicker = false
                     }
                 )
@@ -739,11 +739,11 @@ fun HomeScreen(
                     uid = user?.uid ?: "",
                     onDismiss = { showLocationPicker = false },
                     onLocationSelected = { lat, lng, name ->
-                        locationViewModel.setLocation(lat, lng, name)
+                        locationViewModel.setLocation(context, lat, lng, name)
                         showLocationPicker = false
                     },
                     onUseLiveLocation = {
-                        locationViewModel.fetchLocation(context)
+                        locationViewModel.fetchLocation(context, force = true)
                         showLocationPicker = false
                     }
                 )
