@@ -1,6 +1,7 @@
 package com.abhi.madadwala_1.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,24 +14,66 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.abhi.madadwala_1.ui.theme.MadadwalaColors
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ComingSoonScreen(
     cityName: String = "Your City",
+    address: String = "Locating...",
+    onLocationClick: () -> Unit = {},
     onNotifyMe: () -> Unit = {}
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF1F4F0)) 
-    ) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column(
+                        modifier = Modifier
+                            .clickable { onLocationClick() }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "Change Location",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = MadadwalaColors.Green,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = address,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.White,
+                    titleContentColor = Color.Black
+                )
+            )
+        },
+        containerColor = Color(0xFFF1F4F0)
+    ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(60.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
             // The Hanging Sign Board UI
             Box(
@@ -56,7 +99,7 @@ fun ComingSoonScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp),
                         color = Color.White,
-                        border = androidx.compose.foundation.BorderStroke(4.dp, Color(0xFF1E5631))
+                        border = androidx.compose.foundation.BorderStroke(4.dp, MadadwalaColors.Green)
                     ) {
                         Column(
                             modifier = Modifier.padding(24.dp),
@@ -67,7 +110,7 @@ fun ComingSoonScreen(
                                 Icon(
                                     imageVector = Icons.Default.HomeWork,
                                     contentDescription = null,
-                                    tint = Color(0xFF1E5631),
+                                    tint = MadadwalaColors.Green,
                                     modifier = Modifier.size(32.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -76,12 +119,12 @@ fun ComingSoonScreen(
                                         "Madadwala",
                                         fontWeight = FontWeight.Black,
                                         fontSize = 18.sp,
-                                        color = Color(0xFF1E5631)
+                                        color = MadadwalaColors.Green
                                     )
                                     Text(
                                         "Har Madad, Aapke Saath",
                                         fontSize = 8.sp,
-                                        color = Color(0xFF1E5631)
+                                        color = MadadwalaColors.Green
                                     )
                                 }
                             }
@@ -96,7 +139,7 @@ fun ComingSoonScreen(
                                     letterSpacing = 1.sp
                                 ),
                                 textAlign = TextAlign.Center,
-                                color = Color(0xFF1E5631)
+                                color = MadadwalaColors.Green
                             )
 
                             Spacer(modifier = Modifier.height(16.dp))
@@ -104,7 +147,7 @@ fun ComingSoonScreen(
                             Icon(
                                 imageVector = Icons.Default.LocationOn,
                                 contentDescription = null,
-                                tint = Color(0xFF1E5631),
+                                tint = MadadwalaColors.Green,
                                 modifier = Modifier.size(24.dp)
                             )
 
@@ -121,7 +164,7 @@ fun ComingSoonScreen(
 
                             Button(
                                 onClick = onNotifyMe,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E5631)),
+                                colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Green),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.height(48.dp)
                             ) {
@@ -157,7 +200,7 @@ fun ComingSoonScreen(
 
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFF1E5631),
+                        color = MadadwalaColors.Green,
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Row(
@@ -205,7 +248,7 @@ fun TrustFeature(icon: ImageVector, label: String) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color(0xFF1E5631),
+                tint = MadadwalaColors.Green,
                 modifier = Modifier.size(20.dp)
             )
         }

@@ -488,7 +488,7 @@ fun Step1(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
         PrimaryButton(
             text = "Next",
@@ -519,10 +519,12 @@ fun Step2(
     onUseCurrentLocation: () -> Unit,
     onNext: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 24.dp)
+            .verticalScroll(scrollState)
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -705,7 +707,7 @@ fun Step2(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(32.dp))
 
         PrimaryButton(
             text = "Next",
@@ -956,7 +958,7 @@ fun Step3(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
         Spacer(modifier = Modifier.height(32.dp))
 
         PrimaryButton(

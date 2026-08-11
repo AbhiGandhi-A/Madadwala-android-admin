@@ -131,7 +131,7 @@ class BookingChatViewModel : ViewModel() {
                 try {
                     val data = args[0] as? JSONObject ?: return@on
                     val msgBookingId = data.optString("bookingId")
-                    
+
                     if (msgBookingId == currentBookingId || msgBookingId.isEmpty()) {
                         val senderUid = data.optString("senderUid")
                         val message = data.optString("message")
@@ -154,7 +154,7 @@ class BookingChatViewModel : ViewModel() {
                         
                         viewModelScope.launch {
                             val currentList = _messages.value
-                            val existingIndex = currentList.indexOfFirst { 
+                            val existingIndex = currentList.indexOfFirst {
                                 it._id == msgId || (it._id.startsWith("temp_") && it.message == message && it.senderUid == senderUid)
                             }
                             

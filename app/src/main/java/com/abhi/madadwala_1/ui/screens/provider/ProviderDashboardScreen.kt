@@ -69,6 +69,7 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -125,36 +126,78 @@ fun ProviderDashboardScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var operationalCities by remember { mutableStateOf<List<String>>(emptyList()) }
-    var isCityOperational by remember { mutableStateOf(true) }
+    var isCityOperational by remember { mutableStateOf(false) }
     var cityCheckLoading by remember { mutableStateOf(true) }
+    var isCitiesLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         try {
             val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getOperationalCities()
             if (res.isSuccessful) {
                 operationalCities = res.body()?.map { it.name } ?: emptyList()
+                isCitiesLoaded = true
             }
-        } catch (_: Exception) {}
-    }
-
-    LaunchedEffect(address, operationalCities) {
-        if (address.isNotEmpty() && address != "Locating..." && operationalCities.isNotEmpty()) {
-            isCityOperational = operationalCities.any { city ->
-                address.contains(city, ignoreCase = true)
-            }
-            cityCheckLoading = false
-        } else if (address == "Locating...") {
-            cityCheckLoading = true
-        } else if (operationalCities.isEmpty() && address.isNotEmpty()) {
-            // Wait for cities to load
+        } catch (_: Exception) {
+            isCitiesLoaded = true // Even on error, stop blocking
         }
     }
 
-    if (!isCityOperational && !cityCheckLoading) {
+    LaunchedEffect(address, operationalCities, isCitiesLoaded) {
+        if (!isCitiesLoaded) {
+            cityCheckLoading = true
+            return@LaunchedEffect
+        }
+
+        if (address.isNotEmpty() && address != "Locating...") {
+            if (operationalCities.isEmpty()) {
+                // If no cities in admin dashboard, app is operational for EVERYONE (Initial phase)
+                isCityOperational = true
+            } else {
+                isCityOperational = operationalCities.any { city ->
+                    address.contains(city, ignoreCase = true)
+                }
+            }
+            cityCheckLoading = false
+        } else {
+            cityCheckLoading = true
+        }
+    }
+
+    if (cityCheckLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = MadadwalaColors.Teal)
+        }
+        return
+    }
+
+    if (!isCityOperational) {
         com.abhi.madadwala_1.ui.screens.ComingSoonScreen(
             cityName = address.split(",").firstOrNull()?.trim() ?: "Your City",
             onNotifyMe = {
-                Toast.makeText(context, "We'll notify you when we launch here!", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    try {
+                        val cityName = address.split(",").firstOrNull()?.trim() ?: "Your City"
+                        val token = com.google.firebase.messaging.FirebaseMessaging.getInstance().token.await()
+                        val user = (dashboardState as? ProviderDashboardState.Success)?.user
+                        val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.registerLocationInterest(
+                            mapOf(
+                                "uid" to (user?.uid ?: ""),
+                                "cityName" to cityName,
+                                "fcmToken" to token
+                            )
+                        )
+                        if (res.isSuccessful) {
+                            Toast.makeText(context, "We'll notify you when we launch in $cityName!", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "You're already on our waitlist for $cityName!", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Added to waitlist!", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         )
         return

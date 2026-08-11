@@ -295,6 +295,9 @@ interface ApiService {
     @GET("api/admin/analytics")
     suspend fun getAdminAnalytics(): Response<AdminAnalyticsResponse>
 
+    @POST("api/location-interest")
+    suspend fun registerLocationInterest(@Body request: Map<String, String>): Response<MessageResponse>
+
     // Support Chat
     @GET("api/support/messages/{userId}")
     suspend fun getSupportMessages(@Path("userId") userId: String): Response<List<SupportMessage>>

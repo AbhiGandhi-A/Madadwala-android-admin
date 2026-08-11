@@ -78,6 +78,7 @@ import com.airbnb.lottie.compose.*
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 import com.abhi.madadwala_1.ui.viewmodel.CallViewModel
 import com.abhi.madadwala_1.utils.InvoiceGenerator
@@ -154,8 +155,9 @@ fun HomeScreen(
     var nearbyProviders by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.ProviderResponse>>(emptyList()) }
     var isProvidersLoading by remember { mutableStateOf(true) }
     var operationalCities by remember { mutableStateOf<List<String>>(emptyList()) }
-    var isCityOperational by remember { mutableStateOf(true) }
+    var isCityOperational by remember { mutableStateOf(false) }
     var cityCheckLoading by remember { mutableStateOf(true) }
+    var isCitiesLoaded by remember { mutableStateOf(false) }
 
     // Global Request Tracking
     val sessionStartTime = remember { System.currentTimeMillis() }
@@ -182,14 +184,14 @@ fun HomeScreen(
                     val response = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getCustomerCustomRequests(uid)
                     if (response.isSuccessful) {
                         val allRequests = response.body() ?: emptyList()
-                        
+
                         // 1. Filter for REAL-TIME pending requests (created during this session)
                         val currentPending = allRequests.filter { req ->
                             try {
                                 val createdTime = sdf.parse(req.createdAt)?.time ?: 0L
-                                req.status == "pending" && 
-                                !processedIds.contains(req._id) &&
-                                createdTime >= (sessionStartTime - 30000L) // 30s buffer
+                                req.status == "pending" &&
+                                        !processedIds.contains(req._id) &&
+                                        createdTime >= (sessionStartTime - 30000L) // 30s buffer
                             } catch (_: Exception) { false }
                         }
                         myRequests = currentPending
@@ -199,16 +201,16 @@ fun HomeScreen(
                         val recentlyAccepted = allRequests.find { req ->
                             try {
                                 val createdTime = sdf.parse(req.createdAt)?.time ?: 0L
-                                req.status == "accepted" && 
-                                !processedIds.contains(req._id) && 
-                                createdTime >= (sessionStartTime - 30000L)
+                                req.status == "accepted" &&
+                                        !processedIds.contains(req._id) &&
+                                        createdTime >= (sessionStartTime - 30000L)
                             } catch (_: Exception) { false }
                         }
 
                         if (recentlyAccepted != null) {
-                            val nameFromRequest = recentlyAccepted.acceptedProviderName 
+                            val nameFromRequest = recentlyAccepted.acceptedProviderName
                                 ?: recentlyAccepted.bids.find { it.providerUid == recentlyAccepted.acceptedProviderUid }?.providerName
-                            
+
                             // If we still don't have a name, try to find it in the nearby providers list
                             val finalProviderName = nameFromRequest ?: nearbyProviders.find { it.uid == recentlyAccepted.acceptedProviderUid }?.name ?: "Partner"
 
@@ -221,7 +223,7 @@ fun HomeScreen(
                         } else {
                             // 3. Detect if a request from THIS session disappeared (likely accepted and converted to booking)
                             val disappearedIds = (prevPendingIds - allRequests.map { it._id }.toSet())
-                            
+
                             if (disappearedIds.isNotEmpty()) {
                                 val bookingsRes = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getCustomerBookings(uid)
                                 if (bookingsRes.isSuccessful) {
@@ -263,10 +265,22 @@ fun HomeScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        try {
+            val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getOperationalCities()
+            if (res.isSuccessful) {
+                operationalCities = res.body()?.map { it.name } ?: emptyList()
+                isCitiesLoaded = true
+            }
+        } catch (_: Exception) {
+            isCitiesLoaded = true
+        }
+    }
+
     // Fetch data in background
     LaunchedEffect(uid) {
         if (uid.isBlank()) return@LaunchedEffect
-        
+
         while(true) {
             try {
                 val catResponse = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getCategories()
@@ -287,6 +301,7 @@ fun HomeScreen(
                 val citiesResponse = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getOperationalCities()
                 if (citiesResponse.isSuccessful) {
                     operationalCities = citiesResponse.body()?.map { it.name } ?: emptyList()
+                    isCitiesLoaded = true
                 }
 
                 val providerResponse = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getProviders(
@@ -316,28 +331,82 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(address, operationalCities) {
-        if (address.isNotEmpty() && address != "Locating..." && operationalCities.isNotEmpty()) {
-            isCityOperational = operationalCities.any { city ->
-                address.contains(city, ignoreCase = true)
+    LaunchedEffect(address, operationalCities, isCitiesLoaded) {
+        if (!isCitiesLoaded) {
+            cityCheckLoading = true
+            return@LaunchedEffect
+        }
+
+        if (address.isNotEmpty() && address != "Locating...") {
+            if (operationalCities.isEmpty()) {
+                // If no cities in admin dashboard, app is operational for EVERYONE (Dev/Initial phase)
+                isCityOperational = true
+            } else {
+                isCityOperational = operationalCities.any { city ->
+                    address.contains(city, ignoreCase = true)
+                }
             }
             cityCheckLoading = false
-        } else if (address == "Locating...") {
+        } else {
             cityCheckLoading = true
-        } else if (operationalCities.isEmpty() && !isProvidersLoading) {
-            // If cities list is empty from server, assume not operational yet (initial state)
-            isCityOperational = false
-            cityCheckLoading = false
         }
     }
 
-    if (!isCityOperational && !cityCheckLoading) {
-        ComingSoonScreen(
-            cityName = address.split(",").firstOrNull()?.trim() ?: "Your City",
-            onNotifyMe = {
-                Toast.makeText(context, "We'll notify you when we launch here!", Toast.LENGTH_SHORT).show()
+    if (cityCheckLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = MadadwalaColors.Green)
+        }
+        return
+    }
+
+    if (!isCityOperational) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            ComingSoonScreen(
+                cityName = address.split(",").firstOrNull()?.trim() ?: "Your City",
+                address = address,
+                onLocationClick = { showLocationPicker = true },
+                onNotifyMe = {
+                    scope.launch {
+                        try {
+                            val cityName = address.split(",").firstOrNull()?.trim() ?: "Your City"
+                            val token = com.google.firebase.messaging.FirebaseMessaging.getInstance().token.await()
+                            val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.registerLocationInterest(
+                                mapOf(
+                                    "uid" to uid,
+                                    "cityName" to cityName,
+                                    "fcmToken" to token
+                                )
+                            )
+                            if (res.isSuccessful) {
+                                Toast.makeText(context, "We'll notify you when we launch in $cityName!", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "You're already on our waitlist for $cityName!", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Added to waitlist!", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            )
+
+            if (showLocationPicker) {
+                LocationPickerOverlay(
+                    uid = user?.uid ?: "",
+                    onDismiss = { showLocationPicker = false },
+                    onLocationSelected = { lat, lng, name ->
+                        locationViewModel.setLocation(lat, lng, name)
+                        showLocationPicker = false
+                    },
+                    onUseLiveLocation = {
+                        locationViewModel.fetchLocation(context)
+                        showLocationPicker = false
+                    }
+                )
             }
-        )
+        }
         return
     }
 
@@ -378,10 +447,10 @@ fun HomeScreen(
                         IconButton(onClick = { onNavigate(Screen.Notifications.route) }) {
                             if (unreadCount > 0) {
                                 BadgedBox(
-                                    badge = { 
-                                        Badge(containerColor = MadadwalaColors.Red) { 
-                                            Text(unreadCount.toString(), color = Color.White) 
-                                        } 
+                                    badge = {
+                                        Badge(containerColor = MadadwalaColors.Red) {
+                                            Text(unreadCount.toString(), color = Color.White)
+                                        }
                                     }
                                 ) {
                                     Icon(Icons.Default.NotificationsNone, contentDescription = "Notifications", tint = MadadwalaColors.Green)
@@ -437,12 +506,12 @@ fun HomeScreen(
                                 authViewModel.refresh()
                             }
                         },
-                        label = { 
+                        label = {
                             Text(
-                                text = label, 
+                                text = label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (isSelected) MadadwalaColors.Green else MadadwalaColors.Gray
-                            ) 
+                            )
                         },
                         icon = {
                             if (isSelected) {
@@ -557,8 +626,8 @@ fun HomeScreen(
                         val timeLeftSeconds = ((createdTime + 30000L) - currentTime) / 1000
                         val isTimeout = timeLeftSeconds <= 0 && currentRequest.bids.isEmpty()
 
-                        val availableAndNotRejected = nearbyProviders.filter { 
-                            it.category == currentRequest.category && it.uid !in currentRequest.rejectedBy 
+                        val availableAndNotRejected = nearbyProviders.filter {
+                            it.category == currentRequest.category && it.uid !in currentRequest.rejectedBy
                         }
                         val isNoPartnerFound = (currentRequest.bids.isEmpty() && availableAndNotRejected.isEmpty() && currentRequest.rejectedBy.isNotEmpty()) || isTimeout
 
@@ -571,7 +640,7 @@ fun HomeScreen(
                                 if (isNoPartnerFound) "No Service Found" else "Waiting for Partner to Accept...",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = if (isNoPartnerFound) MadadwalaColors.Red else MadadwalaColors.Green)
                             )
-                            
+
                             if (!isNoPartnerFound && currentRequest.bids.isEmpty() && timeLeftSeconds > 0) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
@@ -588,9 +657,9 @@ fun HomeScreen(
                                 }
                             }
                         }
-                        
+
                         RunningCharacter()
-                        
+
                         Text(
                             if (isNoPartnerFound) "Try again later or choose another category" else "Finding the best match for your ${currentRequest.category} request",
                             style = MaterialTheme.typography.labelSmall,
@@ -598,14 +667,14 @@ fun HomeScreen(
                         )
 
                         if (isNoPartnerFound) {
-                            TextButton(onClick = { 
-                                processedIds = processedIds + currentRequest._id 
+                            TextButton(onClick = {
+                                processedIds = processedIds + currentRequest._id
                                 myRequests = myRequests.filter { it._id != currentRequest._id }
                             }) {
                                 Text("Close", color = MadadwalaColors.Gray, fontWeight = FontWeight.Bold)
                             }
                         }
-                        
+
                         if (currentRequest.bids.isNotEmpty()) {
                             if (currentRequest.isAutoPrice) {
                                 Row(
@@ -873,9 +942,9 @@ fun HomeTabContent(
                     ) {
                         RunningCharacter() // Reusing the lottie for visual
                     }
-                    
+
                     Spacer(modifier = Modifier.width(12.dp))
-                    
+
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "In a hurry? Need help instantly?",
@@ -889,7 +958,7 @@ fun HomeTabContent(
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
-                    
+
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Button(
                             onClick = { onTabSelect(4) },
@@ -1021,11 +1090,11 @@ fun HomeTabContent(
                                     )
                                 }
                                 Text(distanceStr, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                
+
                                 Spacer(modifier = Modifier.height(8.dp))
                                 HorizontalDivider(color = Color.LightGray.copy(0.3f))
                                 Spacer(modifier = Modifier.height(8.dp))
-                                
+
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                     Text(
                                         text = "Starts at ₹${provider.startingPrice.toInt()}",
@@ -1094,7 +1163,7 @@ fun HomeTabContent(
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MadadwalaColors.Green)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             LazyRow(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -1248,9 +1317,9 @@ fun LiveTrackingCard(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 // Left: Provider Info
                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -1288,10 +1357,10 @@ fun LiveTrackingCard(
                         }
                     }
                 }
-                
+
                 // Divider
                 Box(modifier = Modifier.width(1.dp).height(50.dp).background(Color.LightGray.copy(0.3f)))
-                
+
                 // Right Part: Status + Map
                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(modifier = Modifier.padding(horizontal = 8.dp), horizontalAlignment = Alignment.Start) {
@@ -1398,9 +1467,9 @@ fun LiveTrackingCard(
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
@@ -1431,9 +1500,9 @@ fun LiveTrackingCard(
                         Text("Chat", style = MaterialTheme.typography.labelMedium)
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.width(16.dp))
-                
+
                 Text(
                     "View Details >",
                     style = MaterialTheme.typography.labelMedium,
@@ -1662,8 +1731,8 @@ fun CategoriesTabContent(
 
             val realPrices = remember(nearbyProviders, displayCategories) {
                 displayCategories.associateWith { catName ->
-                    val minPrice = nearbyProviders.filter { 
-                        it.category.equals(catName, ignoreCase = true) && it.isAvailable 
+                    val minPrice = nearbyProviders.filter {
+                        it.category.equals(catName, ignoreCase = true) && it.isAvailable
                     }.minByOrNull { it.startingPrice }?.startingPrice?.toInt()
 
                     minPrice?.toString() ?: when(catName) {
@@ -1700,7 +1769,7 @@ fun CategoriesTabContent(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { 
+                                    .clickable {
                                         selectedCategoryName = match
                                         showDialog = true
                                     }
@@ -1802,7 +1871,7 @@ fun CategoriesTabContent(
                     items(sortedCategories.take(9)) { catName ->
                         val category = categories.find { it.name == catName }
                             ?: com.abhi.madadwala_1.data.remote.CategoryResponse("", catName, catName, null)
-                        
+
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
@@ -2074,7 +2143,7 @@ fun BidItem(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    
+
     // bid.price is the Job Value (₹1,000)
     // bid.totalPrice is the customer pay amount (₹1,050)
     val jobValue = bid.price
@@ -2094,9 +2163,9 @@ fun BidItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(bid.providerName, fontWeight = FontWeight.Bold, color = MadadwalaColors.Green)
                 Text("Requested: ${request.category}", style = MaterialTheme.typography.bodySmall)
-                
+
                 Spacer(modifier = Modifier.height(4.dp))
-                
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(
                         text = "Service Price",
@@ -2124,15 +2193,15 @@ fun BidItem(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color.LightGray.copy(alpha = 0.5f))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(
-                        text = "Total Payable", 
-                        fontWeight = FontWeight.Black, 
-                        color = MadadwalaColors.Green, 
+                        text = "Total Payable",
+                        fontWeight = FontWeight.Black,
+                        color = MadadwalaColors.Green,
                         fontSize = 16.sp
                     )
                     Text(
-                        text = "₹${String.format("%.2f", totalCustomerPay)}", 
-                        fontWeight = FontWeight.Black, 
-                        color = MadadwalaColors.Green, 
+                        text = "₹${String.format("%.2f", totalCustomerPay)}",
+                        fontWeight = FontWeight.Black,
+                        color = MadadwalaColors.Green,
                         fontSize = 18.sp
                     )
                 }
@@ -2304,7 +2373,7 @@ fun CustomRequestDialog(
                                 } else {
                                     PriceField(value = minPrice, onValueChange = { minPrice = it }, label = "Price ₹", modifier = Modifier.fillMaxWidth())
                                 }
-                                
+
                                 val minP = minPrice.toDoubleOrNull() ?: 0.0
                                 if (minP > 0) {
                                     val gst = minP * 0.075
@@ -2341,7 +2410,7 @@ fun CustomRequestDialog(
                                     if (userLat != 0.0 && userLng != 0.0) {
                                         val minP = minPrice.toDoubleOrNull()
                                         val maxP = if (isPriceRange) maxPrice.toDoubleOrNull() else null
-                                        
+
                                         // Calculate inclusive totals
                                         val finalMin = if (minP != null) minP + (minP * 0.15) else null
                                         val finalMax = if (maxP != null) maxP + (maxP * 0.15) else null
@@ -2726,7 +2795,7 @@ fun BookingsTabContent(uid: String, onNavigate: (String) -> Unit, callViewModel:
                 items(filteredBookings) { booking ->
                     BookingCardV2(
                         booking = booking,
-                        onViewDetails = { 
+                        onViewDetails = {
                             if (booking.status == "done") {
                                 onNavigate(Screen.WorkCompleted.createRoute(booking._id, isPartner = false))
                             } else {
@@ -2777,7 +2846,7 @@ fun BookingCardV2(
         booking.status == "cancelled" -> Color(0xFFFFEBEE)
         else -> Color(0xFFE8F5E9)
     }
-    
+
     val statusTextColor = when {
         isUnpaidDone -> Color(0xFFF44336) // Red for PAY NOW
         booking.status == "done" -> Color(0xFF2196F3)
@@ -2848,7 +2917,7 @@ fun BookingCardV2(
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.Gray
                     )
-                    
+
                     if (booking.status == "accepted" || booking.status == "on_the_way" || booking.status == "arrived") {
                         Surface(
                             color = Color(0xFFF5F5F5),
@@ -2863,7 +2932,7 @@ fun BookingCardV2(
                                 color = Color.Gray
                             )
                         }
-                        
+
                         if (booking.otp != null) {
                             Row(
                                 modifier = Modifier.padding(top = 8.dp),
@@ -2898,9 +2967,9 @@ fun BookingCardV2(
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.height(12.dp))
-                    
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.CalendarToday, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -2914,11 +2983,11 @@ fun BookingCardV2(
                         Icon(Icons.Default.Schedule, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = try { 
+                            text = try {
                                 if (booking.scheduledTime.contains("|")) {
                                     booking.scheduledTime.split("|").last().trim()
                                 } else {
-                                    booking.scheduledTime 
+                                    booking.scheduledTime
                                 }
                             } catch(e: Exception) { "10:30 AM" },
                             style = MaterialTheme.typography.labelSmall,
@@ -3121,7 +3190,7 @@ fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNav
                                 balance = state.balance,
                                 walletId = state.walletId,
                                 isVisible = isBalanceVisible,
-                                onToggleVisibility = { 
+                                onToggleVisibility = {
                                     isBalanceVisible = !isBalanceVisible
                                     if (isBalanceVisible) {
                                         viewModel.fetchWalletData()
@@ -3136,7 +3205,7 @@ fun WalletTabContent(user: com.abhi.madadwala_1.data.remote.UserResponse?, onNav
                             com.abhi.madadwala_1.ui.components.WalletQuickActionsRow(
                                 onAddMoney = { onNavigate(Screen.AddMoney.route) },
                                 onSendMoney = { onNavigate(Screen.SendMoney.route) },
-                                onSecureInfo = { 
+                                onSecureInfo = {
                                     Toast.makeText(context, "Your money is safe with our secure payment partners.", Toast.LENGTH_SHORT).show()
                                 },
                                 onHelpSupport = { onNavigate(Screen.HelpSupport.route) }
@@ -4166,7 +4235,7 @@ fun LocationPickerOverlay(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onLocationSelected(addr.lat, addr.lng, addr.label) }
+                                    .clickable { onLocationSelected(addr.lat, addr.lng, addr.fullAddress) }
                                     .padding(vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
