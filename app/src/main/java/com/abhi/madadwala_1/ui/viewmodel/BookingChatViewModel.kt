@@ -103,6 +103,27 @@ class BookingChatViewModel : ViewModel() {
         socket?.on(Socket.EVENT_CONNECT) {
             socket.emit("join_booking", bookingId)
         }
+
+        socket?.on("user_status_change") { args ->
+            if (args.isNotEmpty()) {
+                val data = args[0] as? JSONObject ?: return@on
+                val uid = data.optString("uid")
+                
+                if (uid == _partnerProfile.value?.uid) {
+                    val currentProfile = _partnerProfile.value
+                    if (currentProfile != null) {
+                        var updatedProfile = currentProfile
+                        if (data.has("isOnline")) {
+                            updatedProfile = updatedProfile.copy(isOnline = data.optBoolean("isOnline"))
+                        }
+                        if (data.has("isAvailable")) {
+                            updatedProfile = updatedProfile.copy(isAvailable = data.optBoolean("isAvailable"))
+                        }
+                        _partnerProfile.value = updatedProfile
+                    }
+                }
+            }
+        }
         
         socket?.off("receive_message")
         socket?.on("receive_message") { args ->

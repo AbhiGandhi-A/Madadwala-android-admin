@@ -2692,7 +2692,7 @@ fun BookingsTabContent(uid: String, onNavigate: (String) -> Unit, callViewModel:
                         booking = booking,
                         onViewDetails = { 
                             if (booking.status == "done") {
-                                onNavigate(Screen.WorkCompleted.createRoute(booking._id))
+                                onNavigate(Screen.WorkCompleted.createRoute(booking._id, isPartner = false))
                             } else {
                                 onNavigate(Screen.BookingConfirmation.createRoute(booking._id))
                             }

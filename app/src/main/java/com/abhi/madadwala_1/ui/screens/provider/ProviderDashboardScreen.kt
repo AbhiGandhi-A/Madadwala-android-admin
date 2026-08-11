@@ -408,7 +408,14 @@ fun ProviderDashboardScreen(
                                 isOnline = isOnline,
                                 bookings = state.bookings,
                                 requests = state.customRequests,
-                                onViewDetails = { onNavigateToActiveJob(it) },
+                                onViewDetails = { bookingId -> 
+                                    val booking = state.bookings.find { it._id == bookingId }
+                                    if (booking?.status?.lowercase() == "done" || booking?.status?.lowercase() == "completed") {
+                                        onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.WorkCompleted.createRoute(bookingId, isPartner = true))
+                                    } else {
+                                        onNavigateToActiveJob(bookingId)
+                                    }
+                                },
                                 onSendBid = { id, price -> 
                                     val request = state.customRequests.find { it._id == id }
                                     if (request?.isAutoPrice == true) {
@@ -430,7 +437,14 @@ fun ProviderDashboardScreen(
                             )
                             1 -> ProviderBookingsTab(
                                 bookings = state.bookings,
-                                onViewDetails = { onNavigateToActiveJob(it) },
+                                onViewDetails = { bookingId -> 
+                                    val booking = state.bookings.find { it._id == bookingId }
+                                    if (booking?.status?.lowercase() == "done" || booking?.status?.lowercase() == "completed") {
+                                        onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.WorkCompleted.createRoute(bookingId, isPartner = true))
+                                    } else {
+                                        onNavigateToActiveJob(bookingId)
+                                    }
+                                },
                                 onAcceptDirect = { id, time, comment, custId -> viewModel.updateBookingStatus(id, "accepted", time, comment) },
                                 onCancelBooking = { id, reason -> viewModel.cancelBooking(id, reason) },
                                 onChat = { activeChatBookingId = it },

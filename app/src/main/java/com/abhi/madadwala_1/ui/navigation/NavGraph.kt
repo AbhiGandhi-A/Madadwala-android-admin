@@ -57,8 +57,8 @@ sealed class Screen(val route: String) {
     object BookingConfirmation : Screen("booking_confirmation/{bookingId}") {
         fun createRoute(bookingId: String) = "booking_confirmation/$bookingId"
     }
-    object WorkCompleted : Screen("work_completed/{bookingId}") {
-        fun createRoute(bookingId: String) = "work_completed/$bookingId"
+    object WorkCompleted : Screen("work_completed/{bookingId}/{isPartner}") {
+        fun createRoute(bookingId: String, isPartner: Boolean = false) = "work_completed/$bookingId/$isPartner"
     }
     object LiveTracking : Screen("live_tracking/{bookingId}") {
         fun createRoute(bookingId: String) = "live_tracking/$bookingId"
@@ -449,13 +449,15 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.WorkCompleted.route) { backStackEntry ->
             val bookingId = backStackEntry.arguments?.getString("bookingId") ?: ""
+            val isPartner = backStackEntry.arguments?.getString("isPartner")?.toBoolean() ?: false
             val context = androidx.compose.ui.platform.LocalContext.current
             val scope = androidx.compose.runtime.rememberCoroutineScope()
             WorkCompletedScreen(
                 bookingId = bookingId,
+                isPartner = isPartner,
                 onHome = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Home.route) { inclusive = true }
+                    navController.navigate(if (isPartner) Screen.ProviderDashboard.route else Screen.Home.route) {
+                        popUpTo(0) { inclusive = true }
                     }
                 },
                 onRate = { bId, pUid ->

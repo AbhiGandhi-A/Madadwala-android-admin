@@ -215,10 +215,11 @@ fun ChatTopBar(
                         )
                     }
                 }
+                val isTrulyOnline = partnerProfile?.isAvailable == true && partnerProfile?.isOnline == true
                 Text(
-                    text = if (partnerProfile?.isOnline == true) "Online" else "Offline",
+                    text = if (isTrulyOnline) "Online" else "Offline",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (partnerProfile?.isOnline == true) Color(0xFF4CAF50) else Color.Gray
+                    color = if (isTrulyOnline) Color(0xFF4CAF50) else Color.Gray
                 )
             }
             

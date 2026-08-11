@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun WorkCompletedScreen(
     bookingId: String,
+    isPartner: Boolean = false,
     onHome: () -> Unit,
     onRate: (String, String) -> Unit,
     onInvoice: (BookingResponse) -> Unit
@@ -45,6 +46,8 @@ fun WorkCompletedScreen(
                 if (response.isSuccessful) {
                     val b = response.body()
                     booking = b
+                    
+                    // For customers, show provider details. For partners, show customer context if needed.
                     b?.providerUid?.let { uid ->
                         val pResponse = RetrofitClient.apiService.getProviderDetails(uid)
                         if (pResponse.isSuccessful) {
@@ -68,6 +71,7 @@ fun WorkCompletedScreen(
             WorkCompletedUI(
                 booking = booking!!,
                 providerDetail = providerDetail,
+                isPartner = isPartner,
                 onHome = onHome,
                 onRate = { onRate(bookingId, booking!!.providerUid) },
                 onInvoice = { onInvoice(booking!!) }
@@ -89,6 +93,7 @@ fun WorkCompletedScreen(
 fun WorkCompletedUI(
     booking: BookingResponse,
     providerDetail: ProviderDetailResponse?,
+    isPartner: Boolean,
     onHome: () -> Unit,
     onRate: () -> Unit,
     onInvoice: () -> Unit
@@ -110,14 +115,15 @@ fun WorkCompletedUI(
         )
 
         Text(
-            text = "Work Completed!",
+            text = if (isPartner) "Job Completed!" else "Work Completed!",
             fontSize = 28.sp,
             fontWeight = FontWeight.ExtraBold,
             color = MadadwalaColors.Green
         )
         
         Text(
-            text = "Your service for ${booking.serviceName} has been successfully completed.",
+            text = if (isPartner) "You have successfully completed the service for ${booking.customerName ?: "Customer"}."
+                  else "Your service for ${booking.serviceName} has been successfully completed.",
             textAlign = TextAlign.Center,
             color = Color.Gray,
             fontSize = 15.sp,
@@ -133,22 +139,33 @@ fun WorkCompletedUI(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (providerDetail?.provider?.profileImage?.isNotEmpty() == true) {
-                        AsyncImage(
-                            model = providerDetail.provider.profileImage,
-                            contentDescription = null,
-                            modifier = Modifier.size(56.dp).clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
+                    if (isPartner) {
                         Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(Color(0xFFE8F5E9)), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.Person, tint = MadadwalaColors.Green, modifier = Modifier.size(30.dp), contentDescription = null)
                         }
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(providerDetail?.provider?.name ?: booking.providerName ?: "Partner", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(booking.serviceName, color = Color.Gray, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(booking.customerName ?: "Customer", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(booking.serviceName, color = Color.Gray, fontSize = 14.sp)
+                        }
+                    } else {
+                        if (providerDetail?.provider?.profileImage?.isNotEmpty() == true) {
+                            AsyncImage(
+                                model = providerDetail.provider.profileImage,
+                                contentDescription = null,
+                                modifier = Modifier.size(56.dp).clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(Color(0xFFE8F5E9)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, tint = MadadwalaColors.Green, modifier = Modifier.size(30.dp), contentDescription = null)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(providerDetail?.provider?.name ?: booking.providerName ?: "Partner", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(booking.serviceName, color = Color.Gray, fontSize = 14.sp)
+                        }
                     }
                 }
                 
@@ -156,7 +173,7 @@ fun WorkCompletedUI(
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text("Total Amount Paid", color = Color.Gray, fontSize = 12.sp)
+                        Text(if (isPartner) "Earnings" else "Total Amount Paid", color = Color.Gray, fontSize = 12.sp)
                         Text("₹${booking.totalAmount}", fontWeight = FontWeight.Black, fontSize = 20.sp, color = MadadwalaColors.Green)
                     }
                     Column(horizontalAlignment = Alignment.End) {
@@ -172,18 +189,19 @@ fun WorkCompletedUI(
         Spacer(modifier = Modifier.weight(1f))
 
         // Actions
-        Button(
-            onClick = onRate,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Green),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Icon(Icons.Default.Star, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Rate & Review Partner", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        if (!isPartner) {
+            Button(
+                onClick = onRate,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Green),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Star, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Rate & Review Partner", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
         }
-
-        Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedButton(
             onClick = onInvoice,
