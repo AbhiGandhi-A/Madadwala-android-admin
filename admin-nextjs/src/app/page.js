@@ -695,21 +695,74 @@ export default function AdminDashboard() {
 
               {activeModal === 'kyc-viewer' && selectedUser && (
                 <div className="space-y-6">
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <p className="text-[11px] font-medium text-gray-400 mb-2 uppercase tracking-wide">Aadhaar Number</p>
-                    <p className="font-bold text-lg text-gray-800">{selectedUser.aadhaarNumber || 'Not provided'}</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Aadhaar Number</p>
+                      <p className="font-bold text-[16px] text-gray-900">{selectedUser.aadhaarNumber || 'Not provided'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Contact Details</p>
+                      <p className="font-bold text-[14px] text-gray-800">{selectedUser.phoneNumber}</p>
+                      <p className="text-[12px] text-gray-500 font-medium">{selectedUser.email || 'No email'}</p>
+                    </div>
                   </div>
+
                   <div>
-                    <p className="text-[11px] font-medium text-gray-400 mb-2 uppercase tracking-wide">Identity Proof</p>
+                    <p className="text-[11px] font-bold text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-2">
+                      <CreditCard size={14}/>
+                      Identity Proof (Aadhaar Card)
+                    </p>
                     {selectedUser.aadhaarImage ? (
-                      <img src={selectedUser.aadhaarImage} className="w-full rounded-xl shadow-sm border border-gray-200 cursor-zoom-in" onClick={()=>window.open(selectedUser.aadhaarImage)} />
+                      <div className="group relative">
+                        <img
+                          src={selectedUser.aadhaarImage}
+                          className="w-full rounded-2xl shadow-md border border-gray-200 cursor-zoom-in group-hover:brightness-90 transition-all"
+                          onClick={()=>window.open(selectedUser.aadhaarImage)}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <span className="bg-black/60 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-sm">Click to expand</span>
+                        </div>
+                      </div>
                     ) : (
-                      <div className="bg-gray-50 h-40 rounded-xl flex items-center justify-center text-gray-300 border border-dashed border-gray-200">No image uploaded</div>
+                      <div className="bg-gray-50 h-48 rounded-2xl flex flex-col items-center justify-center text-gray-300 border border-dashed border-gray-200 gap-3">
+                        <ShieldAlert size={32} strokeWidth={1.5} />
+                        <span className="text-xs font-medium">No Aadhaar image uploaded</span>
+                      </div>
                     )}
                   </div>
+
                   <div>
-                    <p className="text-[11px] font-medium text-gray-400 mb-2 uppercase tracking-wide">Selfie / Profile</p>
-                    <img src={selectedUser.profileImage || 'https://via.placeholder.com/150'} className="w-full rounded-xl shadow-sm border border-gray-200" />
+                    <p className="text-[11px] font-bold text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-2">
+                      <User size={14}/>
+                      Selfie / Profile Photo
+                    </p>
+                    <img
+                      src={selectedUser.profileImage || 'https://via.placeholder.com/150'}
+                      className="w-full rounded-2xl shadow-md border border-gray-200"
+                    />
+                  </div>
+
+                  <div className="pt-6 border-t border-gray-100 flex gap-3">
+                    <button
+                      onClick={() => { setActiveModal('reject-kyc'); setFormState({...formState, rejectionReason: ''}); }}
+                      className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-600 hover:text-white transition-all shadow-sm shadow-red-100"
+                    >
+                      Reject Application
+                    </button>
+                    <button
+                      onClick={() => {
+                        if(confirm('Approve this partner? They will be notified and can start taking jobs immediately.')) {
+                          adminApi.approveProvider(selectedUser.uid).then(() => {
+                            fetchTabData('providers-pending');
+                            showToast("Partner Approved");
+                            setActiveModal(null);
+                          });
+                        }
+                      }}
+                      className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-100 transition-all"
+                    >
+                      Approve Partner
+                    </button>
                   </div>
                 </div>
               )}
@@ -1168,23 +1221,47 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
 
 /* ---------- Pending approvals ---------- */
 const PendingView = ({ providers, onApprove, onReject, onViewKyc }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 animate-in fade-in duration-300">
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
     {providers.length === 0 ? (
-      <div className="col-span-full p-20 bg-white rounded-2xl border border-dashed border-gray-200 text-center text-gray-300 font-medium text-[13px]">No pending approvals</div>
+      <div className="col-span-full p-24 bg-white rounded-3xl border border-dashed border-gray-200 text-center text-gray-400 font-medium text-[14px]">No applications awaiting review</div>
     ) : (
       providers.map(p => (
-        <div key={p.uid} className="bg-white p-6 rounded-2xl border border-gray-200 relative hover:shadow-md transition-shadow text-center">
-          <div className="absolute top-3.5 right-3.5 flex gap-1">
-            <button title="Reject" onClick={()=>onReject(p)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><X size={14}/></button>
-            <button title="Approve" onClick={()=>onApprove(p.uid)} className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:scale-95 transition-all"><Check size={14}/></button>
+        <div key={p.uid} className="bg-white p-6 rounded-2xl border border-gray-200 relative hover:shadow-xl transition-all duration-300 group">
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button title="Reject" onClick={()=>onReject(p)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all transform active:scale-95 shadow-sm"><X size={16}/></button>
+            <button title="Approve" onClick={()=>onApprove(p.uid)} className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 active:scale-95 transition-all transform shadow-md shadow-emerald-100"><Check size={16}/></button>
           </div>
-          <img src={p.profileImage || 'https://via.placeholder.com/100'} className="w-16 h-16 rounded-2xl object-cover ring-4 ring-gray-50 mx-auto mb-4" />
-          <h4 className="font-semibold text-[14px] text-gray-900">{p.name}</h4>
-          <p className="text-[12px] font-medium text-indigo-500 mt-1 mb-5">{p.profession}</p>
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
-            <p className="text-[11px] font-medium text-gray-400">ID: <span className="text-gray-700 font-semibold">{p.aadhaarNumber}</span></p>
-            <Eye size={16} onClick={()=>onViewKyc(p)} className="text-indigo-400 cursor-pointer hover:scale-110 transition-transform"/>
+
+          <div className="flex items-center gap-4 mb-6">
+            <img src={p.profileImage || 'https://via.placeholder.com/100'} className="w-16 h-16 rounded-2xl object-cover ring-4 ring-gray-50 shadow-sm" />
+            <div className="text-left overflow-hidden">
+              <h4 className="font-bold text-[15px] text-gray-900 truncate">{p.name}</h4>
+              <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">{p.profession || p.category}</p>
+            </div>
           </div>
+
+          <div className="grid grid-cols-1 gap-2.5 text-left mb-6">
+            <div className="flex items-center gap-2.5 px-3 py-2 bg-gray-50 rounded-lg">
+              <Phone size={12} className="text-gray-400" />
+              <span className="text-[12px] font-medium text-gray-600">{p.phoneNumber}</span>
+            </div>
+            <div className="flex items-center gap-2.5 px-3 py-2 bg-gray-50 rounded-lg">
+              <Mail size={12} className="text-gray-400" />
+              <span className="text-[12px] font-medium text-gray-600 truncate">{p.email || 'No email provided'}</span>
+            </div>
+            <div className="flex items-center gap-2.5 px-3 py-2 bg-gray-50 rounded-lg">
+              <CreditCard size={12} className="text-gray-400" />
+              <span className="text-[12px] font-medium text-gray-600">Aadhaar: {p.aadhaarNumber || 'Pending'}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={()=>onViewKyc(p)}
+            className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors shadow-sm"
+          >
+            <Eye size={14} />
+            Review KYC Documents
+          </button>
         </div>
       ))
     )}

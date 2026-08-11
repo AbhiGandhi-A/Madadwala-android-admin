@@ -135,7 +135,10 @@ class ProviderViewModel : ViewModel() {
                         rating = providerInfo?.rating,
                         reviewCount = providerInfo?.reviewCount,
                         totalJobs = bookings.count { it.status == "done" },
-                        totalEarnings = bookings.filter { it.paymentStatus?.lowercase() == "paid" }.sumOf { it.totalAmount }
+                        totalEarnings = bookings.filter { it.paymentStatus?.lowercase() == "paid" }.sumOf { it.totalAmount },
+                        aadhaarNumber = providerInfo?.aadhaarNumber ?: rawUserUnwrapped.aadhaarNumber,
+                        verificationDate = providerInfo?.verificationDate ?: rawUserUnwrapped.verificationDate,
+                        profession = providerInfo?.profession ?: rawUserUnwrapped.profession
                     )
 
                     _isOnline.value = providerInfo?.isAvailable ?: true

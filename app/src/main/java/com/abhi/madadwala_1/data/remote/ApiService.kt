@@ -518,6 +518,9 @@ data class ProviderResponse(
     val lat: Double? = null,
     val lng: Double? = null,
     val bio: String? = null,
+    val aadhaarNumber: String? = null,
+    val verificationDate: String? = null,
+    val profession: String? = null,
     val createdAt: String? = null
 )
 
@@ -619,7 +622,8 @@ data class UserResponse(
     val verificationDate: String? = null,
     val profession: String? = null,
     val pendingReferralDiscount: Double? = 0.0,
-    val bankDetails: BankDetailsResponse? = null
+    val bankDetails: BankDetailsResponse? = null,
+    val createdAt: String? = null
 )
 
 data class TransactionResponse(

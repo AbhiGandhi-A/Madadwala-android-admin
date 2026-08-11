@@ -1513,9 +1513,9 @@ fun ProviderProfileTab(
                                         VerticalDivider(modifier = Modifier.height(40.dp).padding(horizontal = 4.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.5f))
                                         StatMiniItem(
                                             icon = Icons.Default.AssignmentTurnedIn,
-                                            value = "156",
+                                            value = "${user.totalJobs ?: 0}",
                                             label = "Jobs Completed",
-                                            subtext = "This Month",
+                                            subtext = "Lifetime",
                                             modifier = Modifier.weight(1f)
                                         )
                                         VerticalDivider(modifier = Modifier.height(40.dp).padding(horizontal = 4.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.5f))
@@ -1528,9 +1528,31 @@ fun ProviderProfileTab(
                                             modifier = Modifier.weight(1f)
                                         )
                                         VerticalDivider(modifier = Modifier.height(40.dp).padding(horizontal = 4.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.5f))
+                                        
+                                        val experienceText = remember(user.createdAt) {
+                                            if (user.createdAt == null) "New Joiner"
+                                            else {
+                                                try {
+                                                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                                                    val created = sdf.parse(user.createdAt.take(10))
+                                                    val now = java.util.Date()
+                                                    val diff = now.time - created.time
+                                                    val days = diff / (1000 * 60 * 60 * 24)
+                                                    when {
+                                                        days < 30 -> "New Joiner"
+                                                        days < 365 -> "${days / 30} Months"
+                                                        else -> "${String.format("%.1f", days / 365.0)} Years"
+                                                    }
+                                                } catch (e: Exception) { "New Joiner" }
+                                            }
+                                        }
+
+                                        val experienceValue = if (!user.profession.isNullOrEmpty()) user.profession 
+                                                            else experienceText
+
                                         StatMiniItem(
                                             icon = Icons.Default.Stars,
-                                            value = "2+ Years",
+                                            value = experienceValue,
                                             label = "Experience",
                                             subtext = "On Madadwala",
                                             modifier = Modifier.weight(1f)
@@ -1972,8 +1994,15 @@ fun KycSubScreen(user: UserResponse, onBack: () -> Unit) {
                         else Text("Update & Re-apply", fontWeight = FontWeight.Bold)
                     }
                 } else {
-                    KycRow("Aadhaar Number", user.aadhaarNumber ?: "Not Provided")
-                    KycRow("Verification Date", user.verificationDate ?: "Pending")
+                    val displayAadhaar = if (user.aadhaarNumber.isNullOrEmpty()) "Verified" 
+                                        else "**** **** ${user.aadhaarNumber.takeLast(4)}"
+                                        
+                    val displayDate = if (user.verificationDate.isNullOrEmpty()) {
+                        if (user.isVerified) user.createdAt?.take(10) ?: "Member" else "Pending"
+                    } else user.verificationDate
+
+                    KycRow("Aadhaar Number", displayAadhaar)
+                    KycRow("Verification Date", displayDate)
                     KycRow("Status", if (user.isVerified) "Verified" else "Under Review")
                     
                     if (!user.isVerified && user.aadhaarImage != null) {

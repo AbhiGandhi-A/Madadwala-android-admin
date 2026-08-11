@@ -145,7 +145,7 @@ fun ProviderSignupScreen(
                                 name = name,
                                 email = email,
                                 category = selectedCategory,
-                                profession = selectedCategory, // Use category as profession for now
+                                profession = experience, // Use entered experience string as profession/bio
                                 aadhaarNumber = aadhaarNumber,
                                 referralCode = referralCode,
                                 profileImageUri = selfieUri,
