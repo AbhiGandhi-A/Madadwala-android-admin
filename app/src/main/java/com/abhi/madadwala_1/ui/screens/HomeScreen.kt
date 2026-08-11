@@ -153,6 +153,9 @@ fun HomeScreen(
     var banners by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.BannerResponse>>(emptyList()) }
     var nearbyProviders by remember { mutableStateOf<List<com.abhi.madadwala_1.data.remote.ProviderResponse>>(emptyList()) }
     var isProvidersLoading by remember { mutableStateOf(true) }
+    var operationalCities by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isCityOperational by remember { mutableStateOf(true) }
+    var cityCheckLoading by remember { mutableStateOf(true) }
 
     // Global Request Tracking
     val sessionStartTime = remember { System.currentTimeMillis() }
@@ -281,7 +284,15 @@ fun HomeScreen(
                     banners = bannerResponse.body() ?: emptyList()
                 }
 
-                val providerResponse = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getProviders()
+                val citiesResponse = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getOperationalCities()
+                if (citiesResponse.isSuccessful) {
+                    operationalCities = citiesResponse.body()?.map { it.name } ?: emptyList()
+                }
+
+                val providerResponse = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getProviders(
+                    lat = if (userLat != 0.0) userLat else null,
+                    lng = if (userLng != 0.0) userLng else null
+                )
                 if (providerResponse.isSuccessful) {
                     nearbyProviders = providerResponse.body() ?: emptyList()
                 }
@@ -303,6 +314,31 @@ fun HomeScreen(
         } else {
             locationPermissionState.launchPermissionRequest()
         }
+    }
+
+    LaunchedEffect(address, operationalCities) {
+        if (address.isNotEmpty() && address != "Locating..." && operationalCities.isNotEmpty()) {
+            isCityOperational = operationalCities.any { city ->
+                address.contains(city, ignoreCase = true)
+            }
+            cityCheckLoading = false
+        } else if (address == "Locating...") {
+            cityCheckLoading = true
+        } else if (operationalCities.isEmpty() && !isProvidersLoading) {
+            // If cities list is empty from server, assume not operational yet (initial state)
+            isCityOperational = false
+            cityCheckLoading = false
+        }
+    }
+
+    if (!isCityOperational && !cityCheckLoading) {
+        ComingSoonScreen(
+            cityName = address.split(",").firstOrNull()?.trim() ?: "Your City",
+            onNotifyMe = {
+                Toast.makeText(context, "We'll notify you when we launch here!", Toast.LENGTH_SHORT).show()
+            }
+        )
+        return
     }
 
     Scaffold(

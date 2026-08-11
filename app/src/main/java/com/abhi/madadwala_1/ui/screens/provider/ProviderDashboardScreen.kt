@@ -124,6 +124,42 @@ fun ProviderDashboardScreen(
     val unreadNotificationsCount by preferenceManager.unreadNotificationsCount.collectAsState(initial = 0)
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    var operationalCities by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isCityOperational by remember { mutableStateOf(true) }
+    var cityCheckLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        try {
+            val res = com.abhi.madadwala_1.data.remote.RetrofitClient.apiService.getOperationalCities()
+            if (res.isSuccessful) {
+                operationalCities = res.body()?.map { it.name } ?: emptyList()
+            }
+        } catch (_: Exception) {}
+    }
+
+    LaunchedEffect(address, operationalCities) {
+        if (address.isNotEmpty() && address != "Locating..." && operationalCities.isNotEmpty()) {
+            isCityOperational = operationalCities.any { city ->
+                address.contains(city, ignoreCase = true)
+            }
+            cityCheckLoading = false
+        } else if (address == "Locating...") {
+            cityCheckLoading = true
+        } else if (operationalCities.isEmpty() && address.isNotEmpty()) {
+            // Wait for cities to load
+        }
+    }
+
+    if (!isCityOperational && !cityCheckLoading) {
+        com.abhi.madadwala_1.ui.screens.ComingSoonScreen(
+            cityName = address.split(",").firstOrNull()?.trim() ?: "Your City",
+            onNotifyMe = {
+                Toast.makeText(context, "We'll notify you when we launch here!", Toast.LENGTH_SHORT).show()
+            }
+        )
+        return
+    }
+
     // Handle Online/Offline based on App Lifecycle
     DisposableEffect(lifecycleOwner, preferredOnlineStatus) {
         val observer = LifecycleEventObserver { _, event ->

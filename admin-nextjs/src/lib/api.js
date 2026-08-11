@@ -13,6 +13,9 @@ const trackingApi = axios.create({
 
 export const adminApi = {
   getAnalytics: () => api.get('/admin/analytics'),
+  getOperationalCities: () => api.get('/operational-cities'),
+  addOperationalCity: (data) => api.post('/admin/operational-cities', data),
+  deleteOperationalCity: (id) => api.delete(`/admin/operational-cities/${id}`),
   getPendingProviders: () => api.get('/admin/pending-providers'),
   getAllProviders: () => api.get('/admin/providers-all'),
   getAllUsers: () => api.get('/admin/users'),

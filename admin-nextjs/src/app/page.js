@@ -38,7 +38,8 @@ export default function AdminDashboard() {
     analytics: null, pendingProviders: [], withdrawals: [],
     activeJobs: [], categories: [], offers: [], banners: [],
     settings: {}, chats: [], allUsers: [], allProviders: [],
-    allBookings: [], reports: [], reviews: [], monitor: [], transactions: []
+    allBookings: [], reports: [], reviews: [], monitor: [], transactions: [],
+    cities: []
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -384,6 +385,7 @@ export default function AdminDashboard() {
         case 'offers': res = await adminApi.getOffers(); setData(p => ({...p, offers: res.data})); break;
         case 'banners': res = await adminApi.getBanners(); setData(p => ({...p, banners: res.data})); break;
         case 'settings': res = await adminApi.getSettings(); setData(p => ({...p, settings: res.data})); break;
+        case 'cities': res = await adminApi.getOperationalCities(); setData(p => ({...p, cities: res.data})); break;
         case 'reports': res = await adminApi.getReports(); setData(p => ({...p, reports: res.data})); break;
         case 'reviews': res = await adminApi.getAllReviews(); setData(p => ({...p, reviews: res.data})); break;
         case 'transactions': res = await adminApi.getTransactions(); setData(p => ({...p, transactions: res.data})); break;
@@ -430,7 +432,7 @@ export default function AdminDashboard() {
     'providers-pending': 'Pending approvals', withdrawals: 'Withdrawals', jobs: 'Active jobs',
     'bookings-all': 'Booking history', categories: 'Categories', offers: 'Offers', banners: 'Banners',
     settings: 'Settings', reports: 'Reports', reviews: 'Reviews', support: 'Support',
-    transactions: 'Financial logs'
+    transactions: 'Financial logs', cities: 'Operational Cities'
   };
 
   return (
@@ -475,6 +477,7 @@ export default function AdminDashboard() {
           <NavItem icon={<Tag size={16}/>} label="Categories" active={activeTab==='categories'} onClick={()=>setActiveTab('categories')} />
           <NavItem icon={<ImageIcon size={16}/>} label="Banners" active={activeTab==='banners'} onClick={()=>setActiveTab('banners')} />
           <NavItem icon={<Bell size={16}/>} label="Offers" active={activeTab==='offers'} onClick={()=>setActiveTab('offers')} />
+          <NavItem icon={<MapPin size={16}/>} label="Cities" active={activeTab==='cities'} onClick={()=>setActiveTab('cities')} />
           <NavItem icon={<Settings size={16}/>} label="Settings" active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} />
         </nav>
         <div className="p-3 border-t border-white/10">
@@ -519,6 +522,7 @@ export default function AdminDashboard() {
               {activeTab === 'reports' && <ReportsView reports={data.reports} onUpdate={(id, s)=>adminApi.updateReport(id, s).then(()=>{fetchTabData('reports'); showToast("Updated");})} />}
               {activeTab === 'reviews' && <ReviewsView reviews={data.reviews} onDelete={(id)=>adminApi.deleteReview(id).then(()=>{fetchTabData('reviews'); showToast("Deleted");})} />}
               {activeTab === 'transactions' && <TransactionsView transactions={data.transactions} />}
+              {activeTab === 'cities' && <CitiesView cities={data.cities} refresh={()=>fetchTabData('cities')} />}
               {activeTab === 'settings' && <SettingsView settings={data.settings} refresh={()=>{fetchTabData('settings'); showToast("Saved");}} />}
               {activeTab === 'support' && <SupportView chats={data.chats} />}
             </div>
@@ -1135,6 +1139,62 @@ const Legend = ({ color, label }) => (
     <span className="text-[11px] font-medium text-gray-500">{label}</span>
   </div>
 );
+
+/* ---------- Cities ---------- */
+const CitiesView = ({ cities, refresh }) => {
+  const [cityName, setCityName] = useState('');
+  const handleAdd = () => {
+    if (!cityName.trim()) return;
+    adminApi.addOperationalCity({ name: cityName.trim() })
+      .then(() => { setCityName(''); refresh(); })
+      .catch(() => {});
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
+      <div className="bg-white p-7 rounded-2xl border border-gray-200 h-fit">
+        <h3 className="font-semibold mb-6 text-[14px] text-gray-900">Add Operational City</h3>
+        <p className="text-xs text-gray-500 mb-4">The app will only be functional for users in these cities. Others will see the "Coming Soon" screen.</p>
+        <div className="space-y-3">
+          <input
+            value={cityName}
+            onChange={e => setCityName(e.target.value)}
+            placeholder="e.g. Ankleshwar"
+            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg font-medium outline-none focus:border-indigo-400 text-[13px]"
+          />
+          <button
+            onClick={handleAdd}
+            className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg text-[13px] hover:bg-indigo-700 active:scale-[0.98] transition-all"
+          >
+            Add City
+          </button>
+        </div>
+      </div>
+      <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-5">
+        {cities.map(c => (
+          <div key={c._id} className="bg-white p-6 rounded-2xl border border-gray-200 flex flex-col items-center hover:shadow-md transition-shadow group relative">
+            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mb-4 text-emerald-600">
+                <MapPin size={24} />
+            </div>
+            <p className="font-semibold text-gray-800 text-[14px] text-center">{c.name}</p>
+            <p className="text-[10px] text-emerald-500 font-bold uppercase mt-1">Operational</p>
+            <button
+              onClick={() => { if(confirm('Remove this city? Users here will see "Coming Soon".')) adminApi.deleteOperationalCity(c._id).then(refresh) }}
+              className="absolute top-3 right-3 p-2 bg-red-50 text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+            >
+              <Trash2 size={14}/>
+            </button>
+          </div>
+        ))}
+        {cities.length === 0 && (
+            <div className="col-span-full p-12 bg-white rounded-2xl border border-dashed border-gray-200 text-center text-gray-400">
+                No cities added yet. App is currently in "Coming Soon" mode for everyone.
+            </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 /* ---------- Analytics ---------- */
 const AnalyticsView = ({ data }) => !data ? null : (

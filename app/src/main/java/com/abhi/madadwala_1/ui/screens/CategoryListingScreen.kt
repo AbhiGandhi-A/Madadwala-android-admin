@@ -84,10 +84,14 @@ fun CategoryListingScreen(
     val userLng by locationViewModel.longitude.collectAsState()
     val currentAddress by locationViewModel.address.collectAsState()
 
-    LaunchedEffect(category, user?.uid) {
+    LaunchedEffect(category, user?.uid, userLat, userLng) {
         scope.launch {
             try {
-                val pResponse = RetrofitClient.apiService.getProviders(category)
+                val pResponse = RetrofitClient.apiService.getProviders(
+                    category = category,
+                    lat = if (userLat != 0.0) userLat else null,
+                    lng = if (userLng != 0.0) userLng else null
+                )
                 if (pResponse.isSuccessful) {
                     providers = pResponse.body() ?: emptyList()
                 }

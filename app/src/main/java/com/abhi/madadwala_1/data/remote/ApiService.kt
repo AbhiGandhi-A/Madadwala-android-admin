@@ -32,7 +32,14 @@ interface ApiService {
     suspend fun getCategories(): Response<List<CategoryResponse>>
 
     @GET("api/providers")
-    suspend fun getProviders(@Query("category") category: String? = null): Response<List<ProviderResponse>>
+    suspend fun getProviders(
+        @Query("category") category: String? = null,
+        @Query("lat") lat: Double? = null,
+        @Query("lng") lng: Double? = null
+    ): Response<List<ProviderResponse>>
+
+    @GET("api/operational-cities")
+    suspend fun getOperationalCities(): Response<List<CategoryResponse>> // Reusing CategoryResponse as it has name field
 
     @GET("api/providers/{uid}")
     suspend fun getProviderDetails(@Path("uid") uid: String): Response<ProviderDetailResponse>
