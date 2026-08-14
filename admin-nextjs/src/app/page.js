@@ -1250,13 +1250,25 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
             <tr><td colSpan="3" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">No records yet</td></tr>
           ) : (
             users.map(u => (
-              <tr key={u.uid} className="hover:bg-gray-50/60 transition-colors group">
+              <tr key={u.uid} className={`hover:bg-gray-50/60 transition-colors group ${isPartner && u.walletBalance < -100 ? 'bg-red-50/50' : ''}`}>
                 <td className="px-6 py-3.5">
                   <div className="flex items-center gap-3 cursor-pointer" onClick={()=>onDetails(u)}>
-                    <img src={u.profileImage || 'https://via.placeholder.com/32'} className="w-9 h-9 rounded-full object-cover" />
+                    <div className="relative">
+                      <img src={u.profileImage || 'https://via.placeholder.com/32'} className="w-9 h-9 rounded-full object-cover" />
+                      {isPartner && u.walletBalance < -100 && (
+                        <div className="absolute -top-1 -right-1 bg-red-500 text-white p-0.5 rounded-full border-2 border-white">
+                          <AlertTriangle size={8} />
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <p className="font-semibold text-gray-800 text-[13px]">{u.name || 'Unnamed user'}</p>
                       <p className="text-[11.5px] text-gray-400">{u.phoneNumber}</p>
+                      {isPartner && (
+                        <p className={`text-[10px] font-bold ${u.walletBalance < -100 ? 'text-red-500' : 'text-emerald-600'}`}>
+                          Wallet: ₹{u.walletBalance?.toFixed(2) || 0}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </td>

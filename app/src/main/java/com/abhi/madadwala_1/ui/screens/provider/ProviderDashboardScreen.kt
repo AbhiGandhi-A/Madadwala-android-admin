@@ -559,6 +559,52 @@ fun ProviderDashboardScreen(
             onDismiss = { activeChatBookingId = null }
         )
     }
+
+    // Negative Balance Warning Dialog
+    val user = (dashboardState as? ProviderDashboardState.Success)?.user
+    if (user != null && user.walletBalance <= -100) {
+        AlertDialog(
+            onDismissRequest = { },
+            containerColor = Color.White,
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MadadwalaColors.Red, modifier = Modifier.size(48.dp)) },
+            title = { 
+                Text(
+                    "Low Wallet Balance", 
+                    fontWeight = FontWeight.Bold, 
+                    color = MadadwalaColors.Ink,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) 
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Your wallet balance is ₹${user.walletBalance.toInt()}. Please maintain a minimum balance of -₹100 to continue accepting new bookings.",
+                        textAlign = TextAlign.Center,
+                        color = MadadwalaColors.Ink
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "You will not be able to accept any new or instant bookings until the balance is cleared.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MadadwalaColors.Red,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { selectedTab = 2 },
+                    colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Recharge Wallet", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
 }
 
 @Composable
