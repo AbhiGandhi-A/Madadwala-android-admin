@@ -554,10 +554,18 @@ export default function AdminDashboard() {
               {selectedUser && activeModal !== 'broadcast' && (
                 <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
                   <img src={selectedUser.profileImage || 'https://via.placeholder.com/40'} className="w-11 h-11 rounded-full object-cover" />
-                  <div>
+                  <div className="flex-1">
                     <p className="font-semibold text-gray-900 text-sm">{selectedUser.name}</p>
                     <p className="text-[12px] text-gray-500">{selectedUser.phoneNumber}</p>
                   </div>
+                  {activeModal === 'wallet' && (
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Current Balance</p>
+                      <p className={`font-bold text-sm ${selectedUser.walletBalance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        ₹{selectedUser.walletBalance?.toFixed(2) || 0}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
