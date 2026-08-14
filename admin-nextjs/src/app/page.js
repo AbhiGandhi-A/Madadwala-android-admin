@@ -1238,7 +1238,7 @@ const StatCard = ({ title, value, color }) => (
 );
 
 /* ---------- Users table ---------- */
-const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, title }) => (
+const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, title, isPartner }) => (
   <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
     <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
       <h3 className="font-semibold text-gray-900 text-[14px]">{title}</h3>
