@@ -467,14 +467,19 @@ fun ProviderDashboardScreen(
                                     fontSize = 11.sp
                                 )
                             }
-                            Text(
-                                "Recharge", 
-                                color = Color.White, 
-                                fontWeight = FontWeight.Black,
-                                fontSize = 12.sp,
-                                textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
-                                modifier = Modifier.clickable { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.AddMoney.route) }
-                            )
+                            Surface(
+                                modifier = Modifier.clickable { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.AddMoney.route) },
+                                color = Color.White,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    "Recharge", 
+                                    color = MadadwalaColors.Red, 
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
                 }
