@@ -3453,16 +3453,21 @@ fun CustomJobRequestNotification(
     onReject: () -> Unit,
     isLowBalance: Boolean = false
 ) {
-    var timeLeft by remember { mutableFloatStateOf(1.0f) }
+    val duration = 30000L // 30 seconds to accept
+    var timeLeft by remember(request._id) { 
+        val elapsedSinceReceived = System.currentTimeMillis() - request.localReceivedTime
+        mutableFloatStateOf((1.0f - (elapsedSinceReceived.toFloat() / duration)).coerceIn(0f, 1f)) 
+    }
     var bidPrice by remember { mutableStateOf("") }
     
-    LaunchedEffect(Unit) {
-        val duration = 30000L // 30 seconds to accept
-        val startTime = System.currentTimeMillis()
+    LaunchedEffect(request._id, request.localReceivedTime) {
         while (timeLeft > 0) {
-            val elapsed = System.currentTimeMillis() - startTime
+            val elapsed = System.currentTimeMillis() - request.localReceivedTime
             timeLeft = (1.0f - (elapsed.toFloat() / duration)).coerceAtLeast(0f)
-            if (timeLeft <= 0) onReject()
+            if (timeLeft <= 0) {
+                onReject()
+                break
+            }
             kotlinx.coroutines.delay(50)
         }
     }
