@@ -472,7 +472,8 @@ fun ProviderDashboardScreen(
                                 color = Color.White, 
                                 fontWeight = FontWeight.Black,
                                 fontSize = 12.sp,
-                                textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                                textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                                modifier = Modifier.clickable { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.AddMoney.route) }
                             )
                         }
                     }
@@ -536,8 +537,7 @@ fun ProviderDashboardScreen(
                                 },
                                 onSendBid = { id, price -> 
                                     if (isLowBalance) {
-                                        Toast.makeText(context, "Please recharge your wallet to place bids", Toast.LENGTH_LONG).show()
-                                        selectedTab = 2
+                                        onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.AddMoney.route)
                                     } else {
                                         val request = state.customRequests.find { it._id == id }
                                         if (request?.isAutoPrice == true) {
@@ -551,8 +551,7 @@ fun ProviderDashboardScreen(
                                 onCancelBooking = { id, reason -> viewModel.cancelBooking(id, reason) },
                                 onAcceptDirect = { bookingId, time, comment, custId -> 
                                     if (isLowBalance) {
-                                        Toast.makeText(context, "Please recharge your wallet to accept bookings", Toast.LENGTH_LONG).show()
-                                        selectedTab = 2
+                                        onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.AddMoney.route)
                                     } else {
                                         viewModel.updateBookingStatus(bookingId, "accepted", time, comment)
                                     }
@@ -576,8 +575,7 @@ fun ProviderDashboardScreen(
                                 },
                                 onAcceptDirect = { id, time, comment, custId -> 
                                     if (isLowBalance) {
-                                        Toast.makeText(context, "Please recharge your wallet to accept bookings", Toast.LENGTH_LONG).show()
-                                        selectedTab = 2
+                                        onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.AddMoney.route)
                                     } else {
                                         viewModel.updateBookingStatus(id, "accepted", time, comment) 
                                     }
@@ -593,7 +591,8 @@ fun ProviderDashboardScreen(
                                 transactions = state.transactions,
                                 onRefresh = { viewModel.loadDashboardData(false) },
                                 onViewWithdrawalHistory = { selectedTab = 3; subScreen = "withdrawals" },
-                                onSupportClick = { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.HelpSupport.route) }
+                                onSupportClick = { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.HelpSupport.route) },
+                                onAddMoney = { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.AddMoney.route) }
                             )
                             3 -> ProviderProfileTab(
                                 user = state.user,
@@ -1247,7 +1246,15 @@ fun ProviderBookingsTab(
 }
 
 @Composable
-fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<TransactionResponse>, onRefresh: () -> Unit, onViewWithdrawalHistory: () -> Unit, onSupportClick: () -> Unit) {
+fun ProviderPayoutsTab(
+    balance: Double, 
+    totalEarned: Double, 
+    transactions: List<TransactionResponse>, 
+    onRefresh: () -> Unit, 
+    onViewWithdrawalHistory: () -> Unit, 
+    onSupportClick: () -> Unit,
+    onAddMoney: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val auth = remember { com.google.firebase.auth.FirebaseAuth.getInstance() }
@@ -1278,7 +1285,7 @@ fun ProviderPayoutsTab(balance: Double, totalEarned: Double, transactions: List<
                             onRefresh()
                         }
                     },
-                    onAddMoney = { /* TODO: Add money logic */ },
+                    onAddMoney = onAddMoney,
                     onTransactions = { /* Already in transactions list */ }
                 )
             }
