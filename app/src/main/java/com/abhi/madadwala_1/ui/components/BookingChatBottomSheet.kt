@@ -86,6 +86,7 @@ fun BookingChatBottomSheet(
                 ChatTopBar(
                     bookingDetails = bookingDetails,
                     partnerProfile = partnerProfile,
+                    currentUserUid = currentUserUid,
                     onBack = onDismiss
                 )
             },
@@ -110,8 +111,10 @@ fun BookingChatBottomSheet(
                     .padding(padding)
             ) {
                 bookingDetails?.let {
+                    val isProvider = currentUserUid == it.providerUid
                     BookingInfoCard(
                         booking = it,
+                        isProvider = isProvider,
                         onViewDetails = { onViewBookingDetails(it._id) },
                         onViewProfile = { it.providerUid.let { uid -> onViewPartnerProfile(uid) } }
                     )
@@ -169,8 +172,13 @@ fun BookingChatBottomSheet(
 fun ChatTopBar(
     bookingDetails: BookingResponse?,
     partnerProfile: ProviderResponse?,
+    currentUserUid: String,
     onBack: () -> Unit
 ) {
+    val isProvider = currentUserUid == bookingDetails?.providerUid
+    val chatPartnerName = if (isProvider) bookingDetails?.customerName else bookingDetails?.providerName
+    val chatPartnerImage = if (isProvider) bookingDetails?.customerImage else bookingDetails?.providerImage
+
     Surface(
         color = Color.White,
         shadowElevation = 2.dp
@@ -187,7 +195,7 @@ fun ChatTopBar(
             }
             
             AsyncImage(
-                model = bookingDetails?.providerImage ?: "https://via.placeholder.com/150",
+                model = chatPartnerImage ?: "https://via.placeholder.com/150",
                 contentDescription = "Profile",
                 modifier = Modifier
                     .size(40.dp)
@@ -200,12 +208,13 @@ fun ChatTopBar(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = bookingDetails?.providerName ?: "Partner",
+                        text = chatPartnerName ?: "User",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
-                    if (partnerProfile?.isVerified == true) {
+                    val isShowingProvider = !isProvider
+                    if (isShowingProvider && (partnerProfile?.isVerified == true || bookingDetails?.providerName != null)) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             Icons.Default.CheckCircle,
@@ -215,12 +224,14 @@ fun ChatTopBar(
                         )
                     }
                 }
-                val isTrulyOnline = partnerProfile?.isAvailable == true && partnerProfile?.isOnline == true
-                Text(
-                    text = if (isTrulyOnline) "Online" else "Offline",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isTrulyOnline) Color(0xFF4CAF50) else Color.Gray
-                )
+                val isTrulyOnline = if (!isProvider) partnerProfile?.isAvailable == true && partnerProfile?.isOnline == true else false
+                if (!isProvider) {
+                    Text(
+                        text = if (isTrulyOnline) "Online" else "Offline",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isTrulyOnline) Color(0xFF4CAF50) else Color.Gray
+                    )
+                }
             }
             
             IconButton(onClick = { /* Call logic handled by caller */ }) {
@@ -233,6 +244,7 @@ fun ChatTopBar(
 @Composable
 fun BookingInfoCard(
     booking: BookingResponse,
+    isProvider: Boolean,
     onViewDetails: () -> Unit,
     onViewProfile: () -> Unit
 ) {
@@ -306,14 +318,17 @@ fun BookingInfoCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("View Booking Details", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.SemiBold)
                 }
-                Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color(0xFFEEEEEE)))
-                TextButton(
-                    onClick = onViewProfile,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(18.dp), tint = MadadwalaColors.Green)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("View Partner Profile", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.SemiBold)
+                
+                if (!isProvider) {
+                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color(0xFFEEEEEE)))
+                    TextButton(
+                        onClick = onViewProfile,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(18.dp), tint = MadadwalaColors.Green)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View Partner Profile", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
@@ -338,8 +353,13 @@ fun ChatBubble(msg: BookingMessageResponse, isMe: Boolean, bookingDetails: Booki
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMe) {
+            val senderImage = if (msg.senderUid == bookingDetails?.providerUid) {
+                bookingDetails?.providerImage
+            } else {
+                bookingDetails?.customerImage
+            }
             AsyncImage(
-                model = bookingDetails?.providerImage ?: "https://via.placeholder.com/150",
+                model = senderImage ?: "https://via.placeholder.com/150",
                 contentDescription = null,
                 modifier = Modifier
                     .size(32.dp)
@@ -363,7 +383,7 @@ fun ChatBubble(msg: BookingMessageResponse, isMe: Boolean, bookingDetails: Booki
                 modifier = Modifier.widthIn(max = 260.dp)
             ) {
                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    if (msg.imageUrl != null) {
+                    if (!msg.imageUrl.isNullOrBlank()) {
                         AsyncImage(
                             model = msg.imageUrl,
                             contentDescription = null,

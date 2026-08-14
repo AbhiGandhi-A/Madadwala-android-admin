@@ -579,6 +579,7 @@ data class BookingResponse(
     val partnerComment: String? = null,
     val customerPhone: String? = null,
     val providerImage: String? = null,
+    val customerImage: String? = null,
     val issueImages: List<String>? = null,
     val createdAt: String
 )
