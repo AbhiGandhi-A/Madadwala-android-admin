@@ -261,9 +261,12 @@ fun ProviderDashboardScreen(
         }
     }
 
+    val user = (dashboardState as? ProviderDashboardState.Success)?.user
+    val isLowBalance = user != null && user.walletBalance <= -100
+
     Scaffold(
         topBar = {
-            val user = (dashboardState as? ProviderDashboardState.Success)?.user ?: return@Scaffold
+            val safeUser = user ?: return@Scaffold
             Surface(
                 shadowElevation = 0.dp,
                 color = headerBgColor
@@ -409,10 +412,10 @@ fun ProviderDashboardScreen(
                                 .clickable { selectedTab = 3 },
                             contentAlignment = Alignment.Center
                         ) {
-                            if (!user.profileImage.isNullOrEmpty()) {
+                            if (!safeUser.profileImage.isNullOrEmpty()) {
                                 AsyncImage(
                                     model = coil.request.ImageRequest.Builder(LocalContext.current)
-                                        .data(user.profileImage)
+                                        .data(safeUser.profileImage)
                                         .crossfade(true)
                                         .build(),
                                     contentDescription = "Profile",
@@ -421,7 +424,7 @@ fun ProviderDashboardScreen(
                                 )
                             } else {
                                 Text(
-                                    text = (user.name ?: "A").take(1).uppercase(),
+                                    text = (safeUser.name ?: "A").take(1).uppercase(),
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 16.sp
@@ -434,33 +437,74 @@ fun ProviderDashboardScreen(
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
-                val items = listOf(
-                    Triple(0, if (selectedTab == 0) Icons.Default.GridView else Icons.Outlined.GridView, stringResource(R.string.home)),
-                    Triple(1, if (selectedTab == 1) Icons.Default.Assignment else Icons.Outlined.Assignment, stringResource(R.string.bookings)),
-                    Triple(2, if (selectedTab == 2) Icons.Default.AccountBalanceWallet else Icons.Outlined.AccountBalanceWallet, stringResource(R.string.payouts)),
-                    Triple(3, if (selectedTab == 3) Icons.Default.Person else Icons.Outlined.Person, stringResource(R.string.profile))
-                )
-                items.forEach { (index, icon, label) ->
-                    NavigationBarItem(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(26.dp)) },
-                        label = { 
+            Column {
+                if (isLowBalance) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .clickable { selectedTab = 2 },
+                        color = MadadwalaColors.Red,
+                        shape = RoundedCornerShape(12.dp),
+                        shadowElevation = 4.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Error, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Low Balance: ₹${user?.walletBalance?.toInt()}", 
+                                    color = Color.White, 
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                Text(
+                                    "Please recharge to accept new bookings", 
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 11.sp
+                                )
+                            }
                             Text(
-                                text = label, 
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium),
-                                color = if (selectedTab == index) Color(0xFF2E7D32) else Color.Gray
-                            ) 
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF2E7D32),
-                            selectedTextColor = Color(0xFF2E7D32),
-                            unselectedIconColor = Color.Gray,
-                            unselectedTextColor = Color.Gray,
-                            indicatorColor = Color(0xFF2E7D32).copy(alpha = 0.1f)
-                        )
+                                "Recharge", 
+                                color = Color.White, 
+                                fontWeight = FontWeight.Black,
+                                fontSize = 12.sp,
+                                textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                            )
+                        }
+                    }
+                }
+                NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
+                    val items = listOf(
+                        Triple(0, if (selectedTab == 0) Icons.Default.GridView else Icons.Outlined.GridView, stringResource(R.string.home)),
+                        Triple(1, if (selectedTab == 1) Icons.Default.Assignment else Icons.Outlined.Assignment, stringResource(R.string.bookings)),
+                        Triple(2, if (selectedTab == 2) Icons.Default.AccountBalanceWallet else Icons.Outlined.AccountBalanceWallet, stringResource(R.string.payouts)),
+                        Triple(3, if (selectedTab == 3) Icons.Default.Person else Icons.Outlined.Person, stringResource(R.string.profile))
                     )
+                    items.forEach { (index, icon, label) ->
+                        NavigationBarItem(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(26.dp)) },
+                            label = { 
+                                Text(
+                                    text = label, 
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium),
+                                    color = if (selectedTab == index) Color(0xFF2E7D32) else Color.Gray
+                                ) 
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color(0xFF2E7D32),
+                                selectedTextColor = Color(0xFF2E7D32),
+                                unselectedIconColor = Color.Gray,
+                                unselectedTextColor = Color.Gray,
+                                indicatorColor = Color(0xFF2E7D32).copy(alpha = 0.1f)
+                            )
+                        )
+                    }
                 }
             }
         },
@@ -491,23 +535,34 @@ fun ProviderDashboardScreen(
                                     }
                                 },
                                 onSendBid = { id, price -> 
-                                    val request = state.customRequests.find { it._id == id }
-                                    if (request?.isAutoPrice == true) {
-                                        viewModel.submitBid(id, price)
+                                    if (isLowBalance) {
+                                        Toast.makeText(context, "Please recharge your wallet to place bids", Toast.LENGTH_LONG).show()
+                                        selectedTab = 2
                                     } else {
-                                        viewModel.directAccept(id)
+                                        val request = state.customRequests.find { it._id == id }
+                                        if (request?.isAutoPrice == true) {
+                                            viewModel.submitBid(id, price)
+                                        } else {
+                                            viewModel.directAccept(id)
+                                        }
                                     }
                                 },
                                 onRejectRequest = { viewModel.updateCustomRequestStatus(it, "rejected") },
                                 onCancelBooking = { id, reason -> viewModel.cancelBooking(id, reason) },
                                 onAcceptDirect = { bookingId, time, comment, custId -> 
-                                    viewModel.updateBookingStatus(bookingId, "accepted", time, comment)
+                                    if (isLowBalance) {
+                                        Toast.makeText(context, "Please recharge your wallet to accept bookings", Toast.LENGTH_LONG).show()
+                                        selectedTab = 2
+                                    } else {
+                                        viewModel.updateBookingStatus(bookingId, "accepted", time, comment)
+                                    }
                                 },
                                 onNavigateToWallet = { selectedTab = 2 },
                                 onNavigateToRatings = { selectedTab = 3 },
                                 onNavigateToBookings = { selectedTab = 1 },
                                 onChat = { activeChatBookingId = it },
-                                callViewModel = callViewModel
+                                callViewModel = callViewModel,
+                                isLowBalance = isLowBalance
                             )
                             1 -> ProviderBookingsTab(
                                 bookings = state.bookings,
@@ -519,10 +574,18 @@ fun ProviderDashboardScreen(
                                         onNavigateToActiveJob(bookingId)
                                     }
                                 },
-                                onAcceptDirect = { id, time, comment, custId -> viewModel.updateBookingStatus(id, "accepted", time, comment) },
+                                onAcceptDirect = { id, time, comment, custId -> 
+                                    if (isLowBalance) {
+                                        Toast.makeText(context, "Please recharge your wallet to accept bookings", Toast.LENGTH_LONG).show()
+                                        selectedTab = 2
+                                    } else {
+                                        viewModel.updateBookingStatus(id, "accepted", time, comment) 
+                                    }
+                                },
                                 onCancelBooking = { id, reason -> viewModel.cancelBooking(id, reason) },
                                 onChat = { activeChatBookingId = it },
-                                callViewModel = callViewModel
+                                callViewModel = callViewModel,
+                                isLowBalance = isLowBalance
                             )
                             2 -> ProviderPayoutsTab(
                                 balance = state.user.walletBalance,
@@ -560,51 +623,7 @@ fun ProviderDashboardScreen(
         )
     }
 
-    // Negative Balance Warning Dialog
-    val user = (dashboardState as? ProviderDashboardState.Success)?.user
-    if (user != null && user.walletBalance <= -100) {
-        AlertDialog(
-            onDismissRequest = { },
-            containerColor = Color.White,
-            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MadadwalaColors.Red, modifier = Modifier.size(48.dp)) },
-            title = { 
-                Text(
-                    "Low Wallet Balance", 
-                    fontWeight = FontWeight.Bold, 
-                    color = MadadwalaColors.Ink,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                ) 
-            },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "Your wallet balance is ₹${user.walletBalance.toInt()}. Please maintain a minimum balance of -₹100 to continue accepting new bookings.",
-                        textAlign = TextAlign.Center,
-                        color = MadadwalaColors.Ink
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "You will not be able to accept any new or instant bookings until the balance is cleared.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MadadwalaColors.Red,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { selectedTab = 2 },
-                    colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Recharge Wallet", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-        )
-    }
+    // REMOVED Negative Balance Warning Dialog from here as requested
 }
 
 @Composable
@@ -622,7 +641,8 @@ fun ProviderHomeTab(
     onNavigateToRatings: () -> Unit = {},
     onNavigateToBookings: () -> Unit = {},
     onChat: (String) -> Unit,
-    callViewModel: CallViewModel
+    callViewModel: CallViewModel,
+    isLowBalance: Boolean
 ) {
     val scrollState = rememberLazyListState()
     var visible by remember { mutableStateOf(false) }
@@ -977,7 +997,8 @@ fun ProviderHomeTab(
                         CustomJobRequestNotification(
                             request = request,
                             onAccept = { price: Double -> onSendBid(request._id, price) },
-                            onReject = { onRejectRequest(request._id) }
+                            onReject = { onRejectRequest(request._id) },
+                            isLowBalance = isLowBalance
                         )
                     }
                 }
@@ -1051,7 +1072,8 @@ fun ProviderHomeTab(
                             onAccept = { time, comment -> onAcceptDirect(booking._id, time, comment, booking.customerUid) },
                             onReject = { reason -> onCancelBooking(booking._id, reason) },
                             onChat = { onChat(booking._id) },
-                            callViewModel = callViewModel
+                            callViewModel = callViewModel,
+                            isLowBalance = isLowBalance
                         )
                     }
                 }
@@ -1108,7 +1130,8 @@ fun ProviderBookingsTab(
     onAcceptDirect: (String, String, String?, String?) -> Unit,
     onCancelBooking: (String, String) -> Unit,
     onChat: (String) -> Unit,
-    callViewModel: CallViewModel
+    callViewModel: CallViewModel,
+    isLowBalance: Boolean
 ) {
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
     var visible by remember { mutableStateOf(false) }
@@ -1214,7 +1237,8 @@ fun ProviderBookingsTab(
                             onViewDetails = { onViewDetails(booking._id) },
                             onReject = { reason -> onCancelBooking(booking._id, reason) },
                             onChat = { onChat(booking._id) },
-                            callViewModel = callViewModel
+                            callViewModel = callViewModel,
+                            isLowBalance = isLowBalance
                         )
                     }
                 }
@@ -2671,7 +2695,8 @@ fun BookingCard(
     onAccept: (String, String) -> Unit,
     onReject: (String) -> Unit,
     onChat: () -> Unit,
-    callViewModel: CallViewModel
+    callViewModel: CallViewModel,
+    isLowBalance: Boolean = false
 ) {
     val status = booking.status.uppercase()
     var showAcceptDialog by rememberSaveable { mutableStateOf(false) }
@@ -2853,9 +2878,15 @@ fun BookingCard(
                         onClick = { showAcceptDialog = true },
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Green)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isLowBalance) Color.Gray else MadadwalaColors.Green
+                        )
                     ) {
-                        Text(stringResource(R.string.accept), color = Color.White, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                        Text(
+                            text = if (isLowBalance) "Low Balance" else stringResource(R.string.accept), 
+                            color = Color.White, 
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                        )
                     }
                 }
             } else {
@@ -3167,7 +3198,8 @@ fun ModernBookingCard(
     onViewDetails: () -> Unit,
     onReject: (String) -> Unit,
     onChat: () -> Unit,
-    callViewModel: CallViewModel
+    callViewModel: CallViewModel,
+    isLowBalance: Boolean = false
 ) {
     val status = booking.status.uppercase()
     val isDone = status == "DONE" || status == "COMPLETED"
@@ -3415,7 +3447,12 @@ fun ModernBookingCard(
 }
 
 @Composable
-fun CustomJobRequestNotification(request: CustomRequestResponse, onAccept: (Double) -> Unit, onReject: () -> Unit) {
+fun CustomJobRequestNotification(
+    request: CustomRequestResponse, 
+    onAccept: (Double) -> Unit, 
+    onReject: () -> Unit,
+    isLowBalance: Boolean = false
+) {
     var timeLeft by remember { mutableFloatStateOf(1.0f) }
     var bidPrice by remember { mutableStateOf("") }
     
@@ -3548,10 +3585,16 @@ fun CustomJobRequestNotification(request: CustomRequestResponse, onAccept: (Doub
                     },
                     modifier = Modifier.weight(1f).height(56.dp),
                     enabled = !request.isAutoPrice || bidPrice.isNotEmpty(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MadadwalaColors.Teal),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isLowBalance) Color.Gray else MadadwalaColors.Teal
+                    ),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text(if (request.isAutoPrice) "Send Bid" else "Accept", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (isLowBalance) "Recharge to Bid" else (if (request.isAutoPrice) "Send Bid" else "Accept"), 
+                        color = Color.White, 
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
