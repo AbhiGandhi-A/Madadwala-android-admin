@@ -175,7 +175,9 @@ class ProviderViewModel : ViewModel() {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             try {
-                val response = apiService.updateProviderAvailability(uid, mapOf("isAvailable" to online))
+                // Use trackingApiService (Render) instead of apiService (Vercel) 
+                // so that socket notifications are delivered in real-time.
+                val response = trackingApiService.updateProviderAvailability(uid, mapOf("isAvailable" to online))
                 if (response.isSuccessful) {
                     _isOnline.value = online
                     analytics?.setUserProperty("online_status", online.toString())

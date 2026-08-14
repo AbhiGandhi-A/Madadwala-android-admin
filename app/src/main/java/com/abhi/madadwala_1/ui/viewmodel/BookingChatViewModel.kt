@@ -35,6 +35,7 @@ class BookingChatViewModel : ViewModel() {
     private val _partnerProfile = MutableStateFlow<ProviderResponse?>(null)
     val partnerProfile: StateFlow<ProviderResponse?> = _partnerProfile
 
+    private var partnerUid: String? = null
     private var currentBookingId: String? = null
     private val currentUserUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
@@ -55,6 +56,7 @@ class BookingChatViewModel : ViewModel() {
                     
                     // Fetch partner profile for online status
                     booking?.providerUid?.let { uid ->
+                        partnerUid = uid
                         fetchPartnerProfile(uid)
                     }
                 }
@@ -109,7 +111,7 @@ class BookingChatViewModel : ViewModel() {
                 val data = args[0] as? JSONObject ?: return@on
                 val uid = data.optString("uid")
                 
-                if (uid == _partnerProfile.value?.uid) {
+                if (uid == partnerUid || uid == _partnerProfile.value?.uid) {
                     val currentProfile = _partnerProfile.value
                     if (currentProfile != null) {
                         var updatedProfile = currentProfile
@@ -120,6 +122,11 @@ class BookingChatViewModel : ViewModel() {
                             updatedProfile = updatedProfile.copy(isAvailable = data.optBoolean("isAvailable"))
                         }
                         _partnerProfile.value = updatedProfile
+                    } else {
+                        // Profile not fetched yet, but we got a status update.
+                        // We can't update it yet, but the next fetch will get the latest anyway.
+                        // Or we could trigger a refresh.
+                        partnerUid?.let { fetchPartnerProfile(it) }
                     }
                 }
             }

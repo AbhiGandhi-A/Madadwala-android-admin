@@ -205,7 +205,7 @@ fun ChatTopBar(
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
-                    if (partnerProfile?.isVerified == true || bookingDetails?.providerName != null) {
+                    if (partnerProfile?.isVerified == true) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             Icons.Default.CheckCircle,
