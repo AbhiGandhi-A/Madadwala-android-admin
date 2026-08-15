@@ -83,6 +83,26 @@ class ProviderViewModel : ViewModel() {
                     val pLat = providerInfo?.lat
                     val pLng = providerInfo?.lng
 
+                    // Merge provider info into user object
+                    val mergedUser = rawUserUnwrapped.copy(
+                        category = providerInfo?.category ?: rawUserUnwrapped.category,
+                        profileImage = if (providerInfo?.profileImage?.isNotEmpty() == true) providerInfo.profileImage else rawUserUnwrapped.profileImage,
+                        rating = providerInfo?.rating,
+                        reviewCount = providerInfo?.reviewCount,
+                        totalJobs = bookings.count { it.status == "done" },
+                        totalEarnings = bookings.filter { it.paymentStatus?.lowercase() == "paid" }.sumOf { it.totalAmount },
+                        aadhaarNumber = providerInfo?.aadhaarNumber ?: rawUserUnwrapped.aadhaarNumber,
+                        verificationDate = providerInfo?.verificationDate ?: rawUserUnwrapped.verificationDate,
+                        profession = providerInfo?.profession ?: rawUserUnwrapped.profession,
+                        categories = if (!providerInfo?.categories.isNullOrEmpty()) {
+                            providerInfo!!.categories
+                        } else if (!rawUserUnwrapped.categories.isNullOrEmpty()) {
+                            rawUserUnwrapped.categories
+                        } else {
+                            if (providerInfo?.category != null) listOf(providerInfo.category) else null
+                        }
+                    )
+
                     // Filter custom requests by category, status, rejection, and location (50km radius)
                     val allCustomRequests = if (customRequestsResponse.isSuccessful) customRequestsResponse.body() ?: emptyList() else emptyList()
                     val now = System.currentTimeMillis()
@@ -98,7 +118,9 @@ class ProviderViewModel : ViewModel() {
                         // If provider is offline, don't show any custom requests
                         if (!_isOnline.value) return@filter false
 
-                        val categoryMatch = req.category.lowercase() == providerCategory?.lowercase()
+                        val providerCategories = mergedUser.categories ?: listOf(providerCategory ?: "")
+                        val categoryMatch = providerCategories.any { it.equals(req.category, ignoreCase = true) }
+
                         val statusMatch = (req.status.lowercase() == "pending" || req.status.lowercase() == "requested")
                         val notRejected = !req.rejectedBy.contains(uid)
                         val notAlreadyBid = req.bids.none { it.providerUid == uid }
@@ -128,18 +150,6 @@ class ProviderViewModel : ViewModel() {
                     }.map { req ->
                         req.copy(localReceivedTime = requestReceiptTimes[req._id] ?: now)
                     }
-                    
-                    // Merge provider info into user object
-                    val mergedUser = rawUserUnwrapped.copy(
-                        profileImage = if (providerInfo?.profileImage?.isNotEmpty() == true) providerInfo.profileImage else rawUserUnwrapped.profileImage,
-                        rating = providerInfo?.rating,
-                        reviewCount = providerInfo?.reviewCount,
-                        totalJobs = bookings.count { it.status == "done" },
-                        totalEarnings = bookings.filter { it.paymentStatus?.lowercase() == "paid" }.sumOf { it.totalAmount },
-                        aadhaarNumber = providerInfo?.aadhaarNumber ?: rawUserUnwrapped.aadhaarNumber,
-                        verificationDate = providerInfo?.verificationDate ?: rawUserUnwrapped.verificationDate,
-                        profession = providerInfo?.profession ?: rawUserUnwrapped.profession
-                    )
 
                     _isOnline.value = providerInfo?.isAvailable ?: true
 
@@ -324,6 +334,31 @@ class ProviderViewModel : ViewModel() {
                     loadDashboardData()
                 }
             } catch (e: Exception) {}
+        }
+    }
+
+    fun updateCategories(categories: List<String>, onResult: (Boolean) -> Unit = {}) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                val response = apiService.updateProviderCategories(uid, UpdateCategoriesRequest(categories))
+                if (response.isSuccessful) {
+                    val currentState = _dashboardState.value
+                    if (currentState is ProviderDashboardState.Success) {
+                        val updatedUser = currentState.user.copy(categories = categories)
+                        _dashboardState.value = currentState.copy(user = updatedUser)
+                    }
+                    loadDashboardData(showLoading = false)
+                    onResult(true)
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    android.util.Log.e("ProviderViewModel", "Update categories failed: ${response.code()} $errorBody")
+                    onResult(false)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ProviderViewModel", "Update categories error", e)
+                onResult(false)
+            }
         }
     }
 }

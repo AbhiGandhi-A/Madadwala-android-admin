@@ -364,8 +364,13 @@ fun ProfileHeader(provider: com.abhi.madadwala_1.data.remote.ProviderResponse) {
                     )
                 }
             }
+            val displayCategory = if (!provider.categories.isNullOrEmpty()) {
+                provider.categories.joinToString(", ")
+            } else {
+                provider.category
+            }
             Text(
-                text = provider.category,
+                text = displayCategory,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MadadwalaColors.Gray
             )

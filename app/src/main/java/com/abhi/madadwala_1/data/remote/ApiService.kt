@@ -147,6 +147,12 @@ interface ApiService {
         @Body request: Map<String, Boolean>
     ): Response<MessageResponse>
 
+    @POST("api/providers/{uid}/categories-update")
+    suspend fun updateProviderCategories(
+        @Path("uid") uid: String,
+        @Body request: UpdateCategoriesRequest
+    ): Response<MessageResponse>
+
     @PATCH("api/providers/{uid}/location")
     suspend fun updateProviderLocation(
         @Path("uid") uid: String,
@@ -502,7 +508,12 @@ data class ActivityLog(
 )
 
 data class ApproveProviderRequest(val uid: String)
-data class MessageResponse(val message: String)
+data class UpdateCategoriesRequest(val categories: List<String>)
+data class MessageResponse(
+    val message: String? = null,
+    val success: Boolean? = null,
+    val error: String? = null
+)
 
 data class CategoryResponse(
     val _id: String,
@@ -519,6 +530,7 @@ data class ProviderResponse(
     val distance: String?,
     val startingPrice: Double,
     val category: String,
+    val categories: List<String>? = null,
     val isVerified: Boolean,
     val profileImage: String? = null,
     val isAvailable: Boolean = true,
@@ -621,6 +633,7 @@ data class UserResponse(
     val profileImage: String?,
     val aadhaarImage: String?,
     val category: String?,
+    val categories: List<String>? = null,
     val walletBalance: Double,
     val isVerified: Boolean,
     val kycRejected: Boolean = false,

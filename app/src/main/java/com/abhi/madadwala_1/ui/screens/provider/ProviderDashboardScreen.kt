@@ -73,6 +73,8 @@ import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+import com.abhi.madadwala_1.ui.screens.ComingSoonScreen
+import com.abhi.madadwala_1.ui.screens.getIconForCategory
 import com.abhi.madadwala_1.ui.viewmodel.CallViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -609,6 +611,7 @@ fun ProviderDashboardScreen(
                                 onLogout = onLogout,
                                 onUpdateServicePrice = { id, price -> viewModel.updateServicePrice(id, price) },
                                 onAddService = { name, price -> viewModel.addService(name, price) },
+                                onUpdateCategories = { cats, callback -> viewModel.updateCategories(cats, callback) },
                                 onUploadImage = { viewModel.uploadProfileImage(it, context) },
                                 onRefresh = { viewModel.loadDashboardData(false) },
                                 onSupportClick = { onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.HelpSupport.route) }
@@ -1495,6 +1498,7 @@ fun ProviderProfileTab(
     onLogout: () -> Unit,
     onUpdateServicePrice: (String, Double) -> Unit,
     onAddService: (String, Double) -> Unit,
+    onUpdateCategories: (List<String>, (Boolean) -> Unit) -> Unit = { _, _ -> },
     onUploadImage: (Uri) -> Unit,
     onRefresh: () -> Unit,
     onSupportClick: () -> Unit
@@ -1630,8 +1634,15 @@ fun ProviderProfileTab(
                                                 }
                                             }
                                             
+                                            val displayProfession = remember(user.categories, user.category) {
+                                                if (!user.categories.isNullOrEmpty()) {
+                                                    user.categories!!.filter { it.isNotEmpty() }.joinToString(", ")
+                                                } else {
+                                                    user.profession ?: user.category ?: "Professional"
+                                                }
+                                            }
                                             Text(
-                                                text = user.profession ?: user.category ?: "Professional",
+                                                text = displayProfession,
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MadadwalaColors.Gray
                                             )
@@ -1737,7 +1748,8 @@ fun ProviderProfileTab(
                                 ProfileOptionV2(
                                     label = stringResource(R.string.service_categories),
                                     subtext = "Manage your service categories",
-                                    icon = Icons.Default.Category
+                                    icon = Icons.Default.Category,
+                                    onClick = { onSubScreenChange("categories") }
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MadadwalaColors.LightGray.copy(alpha = 0.3f))
                                 ProfileOptionV2(
@@ -1831,6 +1843,31 @@ fun ProviderProfileTab(
                 }
             }
             "kyc" -> KycSubScreen(user) { onSubScreenChange(null) }
+            "categories" -> {
+                val currentCats = remember(user.categories, user.category) {
+                    val list = mutableListOf<String>()
+                    user.categories?.let { list.addAll(it) }
+                    if (list.isEmpty() && !user.category.isNullOrEmpty()) {
+                        list.add(user.category!!)
+                    }
+                    list.filter { it.isNotEmpty() }.distinct()
+                }
+                CategorySelectorSubScreen(
+                    currentCategories = currentCats,
+                    onBack = { onSubScreenChange(null) },
+                    onSave = { selectedList, onComplete ->
+                        onUpdateCategories(selectedList) { success ->
+                            onComplete(success)
+                            if (success) {
+                                Toast.makeText(context, "Categories saved successfully!", Toast.LENGTH_SHORT).show()
+                                onSubScreenChange(null)
+                            } else {
+                                Toast.makeText(context, "Failed to save categories. Check internet or try again.", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                )
+            }
             "bank" -> BankDetailsSubScreen(user.uid, user.bankDetails, onRefresh) { onSubScreenChange(null) }
             "performance" -> PerformanceSubScreen(user.uid) { onSubScreenChange(null) }
             "withdrawals" -> WithdrawalHistorySubScreen(user.uid) { onSubScreenChange(null) }
@@ -1950,6 +1987,202 @@ fun ProfileOptionV2(
             Text(subtext, style = MaterialTheme.typography.labelSmall, color = MadadwalaColors.Gray)
         }
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+fun CategorySelectorSubScreen(
+    currentCategories: List<String>,
+    onBack: () -> Unit,
+    onSave: (List<String>, (Boolean) -> Unit) -> Unit
+) {
+    var allCategories by remember { mutableStateOf<List<CategoryResponse>>(emptyList()) }
+    
+    // Normalize categories for robust matching (lowercase and trimmed)
+    val normalizedCurrent = remember(currentCategories) {
+        currentCategories.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+    }
+    
+    var selectedCategories by remember(normalizedCurrent) { 
+        mutableStateOf(currentCategories.filter { it.trim().isNotEmpty() }.toSet()) 
+    }
+    var isLoading by remember { mutableStateOf(true) }
+    var isSaving by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        try {
+            val res = RetrofitClient.apiService.getCategories()
+            if (res.isSuccessful) {
+                allCategories = res.body() ?: emptyList()
+            }
+        } catch (e: Exception) {
+        } finally {
+            isLoading = false
+        }
+    }
+
+    val displayCategories = if (allCategories.isEmpty()) {
+        listOf(
+            CategoryResponse("", "Cleaning", "Cleaning", null),
+            CategoryResponse("", "Plumbing", "Plumbing", null),
+            CategoryResponse("", "Electrical", "Electrical", null),
+            CategoryResponse("", "Painting", "Painting", null),
+            CategoryResponse("", "Appliances", "Appliance", null),
+            CategoryResponse("", "Carpentry", "Carpentry", null),
+            CategoryResponse("", "Pest Control", "Pest Control", null),
+            CategoryResponse("", "AC Service", "AC Service", null),
+            CategoryResponse("", "Gardening", "Gardening", null)
+        )
+    } else {
+        allCategories
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MadadwalaColors.Ink) }
+            Text("Service Categories", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MadadwalaColors.Ink)
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            "Select the categories you can provide services for. You can select multiple.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.Gray,
+            lineHeight = 20.sp
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (isLoading && allCategories.isEmpty()) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MadadwalaColors.Green)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                items(displayCategories) { category ->
+                    // Robust check: Is this category name (normalized) in our selected set?
+                    val isSelected = selectedCategories.any { 
+                        it.trim().lowercase() == category.name.trim().lowercase() 
+                    }
+                    
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (isSelected) {
+                                    selectedCategories = selectedCategories.filterNot { 
+                                        it.trim().lowercase() == category.name.trim().lowercase() 
+                                    }.toSet()
+                                } else {
+                                    selectedCategories = selectedCategories + category.name
+                                }
+                            },
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isSelected) MadadwalaColors.Green.copy(alpha = 0.08f) else Color.White,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.5.dp, 
+                            if (isSelected) MadadwalaColors.Green else Color(0xFFF0F0F0)
+                        ),
+                        shadowElevation = if (isSelected) 0.dp else 1.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        if (isSelected) MadadwalaColors.Green.copy(alpha = 0.12f) 
+                                        else Color(0xFFF8F8F8), 
+                                        RoundedCornerShape(12.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = getIconForCategory(category.icon ?: category.name),
+                                    contentDescription = null,
+                                    tint = if (isSelected) MadadwalaColors.Green else Color.Gray,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = category.name,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) MadadwalaColors.Green else MadadwalaColors.Ink
+                                    )
+                                )
+                                Text(
+                                    text = if (isSelected) "Selected" else "Click to add",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MadadwalaColors.Green.copy(0.7f) else Color.Gray
+                                )
+                            }
+                            
+                            IconButton(
+                                onClick = {
+                                    if (isSelected) {
+                                        selectedCategories = selectedCategories.filterNot { 
+                                            it.trim().lowercase() == category.name.trim().lowercase() 
+                                        }.toSet()
+                                    } else {
+                                        selectedCategories = selectedCategories + category.name
+                                    }
+                                },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = if (isSelected) MadadwalaColors.Green else Color(0xFFF0F0F0),
+                                    contentColor = if (isSelected) Color.White else Color.Gray
+                                ),
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Default.Check else Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Button(
+            onClick = { 
+                isSaving = true
+                onSave(selectedCategories.toList()) {
+                    isSaving = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MadadwalaColors.Green,
+                contentColor = Color.White,
+                disabledContainerColor = Color.LightGray,
+                disabledContentColor = Color.White.copy(alpha = 0.6f)
+            ),
+            enabled = selectedCategories.isNotEmpty() && !isSaving
+        ) {
+            if (isSaving) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 3.dp)
+            } else {
+                Text(
+                    "Save Categories", 
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
+                )
+            }
+        }
     }
 }
 
