@@ -623,7 +623,8 @@ fun ProviderDashboardScreen(
     activeChatBookingId?.let { bookingId ->
         com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
             bookingId = bookingId,
-            onDismiss = { activeChatBookingId = null }
+            onDismiss = { activeChatBookingId = null },
+            onViewBookingDetails = { id -> onNavigateToActiveJob(id) }
         )
     }
 

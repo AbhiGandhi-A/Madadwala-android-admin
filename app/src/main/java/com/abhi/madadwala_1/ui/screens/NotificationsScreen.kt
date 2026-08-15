@@ -32,14 +32,25 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.abhi.madadwala_1.ui.viewmodel.AuthViewModel
+import com.abhi.madadwala_1.ui.viewmodel.AuthState
+
 enum class NotificationType {
     ALL, MESSAGES, CALLS, UPDATES, SYSTEM
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit = {}) {
+fun NotificationsScreen(
+    onBack: () -> Unit,
+    onNavigate: (String) -> Unit = {},
+    authViewModel: AuthViewModel = viewModel()
+) {
     val context = LocalContext.current
+    val authState by authViewModel.authState.collectAsState()
+    val userRole = (authState as? AuthState.Authenticated)?.user?.role ?: "customer"
+
     val preferenceManager = remember { PreferenceManager(context) }
     val notifications by preferenceManager.savedNotifications.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -198,7 +209,13 @@ fun NotificationsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit = {}) {
         com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
             bookingId = activeChatBookingId!!,
             onDismiss = { activeChatBookingId = null },
-            onViewBookingDetails = { id -> onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.LiveTracking.createRoute(id)) },
+            onViewBookingDetails = { id -> 
+                if (userRole == "provider") {
+                    onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.ProviderActiveJob.createRoute(id))
+                } else {
+                    onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.LiveTracking.createRoute(id))
+                }
+            },
             onViewPartnerProfile = { uid -> onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.ProviderProfile.createRoute(uid)) }
         )
     }

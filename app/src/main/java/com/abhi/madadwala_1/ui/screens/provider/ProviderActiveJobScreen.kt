@@ -743,7 +743,8 @@ fun ProviderActiveJobScreen(
     if (showChatSheet) {
         com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
             bookingId = bookingId,
-            onDismiss = { showChatSheet = false }
+            onDismiss = { showChatSheet = false },
+            onViewBookingDetails = { /* Already on the active job screen */ }
         )
     }
 

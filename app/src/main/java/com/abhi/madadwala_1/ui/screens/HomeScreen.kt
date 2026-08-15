@@ -788,10 +788,17 @@ fun HomeScreen(
     }
 
     activeChatBookingId?.let { bookingId ->
+        val userRole = (authState as? AuthState.Authenticated)?.user?.role ?: "customer"
         com.abhi.madadwala_1.ui.components.BookingChatBottomSheet(
             bookingId = bookingId,
             onDismiss = { activeChatBookingId = null },
-            onViewBookingDetails = { id -> onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.LiveTracking.createRoute(id)) },
+            onViewBookingDetails = { id -> 
+                if (userRole == "provider") {
+                    onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.ProviderActiveJob.createRoute(id))
+                } else {
+                    onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.LiveTracking.createRoute(id))
+                }
+            },
             onViewPartnerProfile = { uid -> onNavigate(com.abhi.madadwala_1.ui.navigation.Screen.ProviderProfile.createRoute(uid)) }
         )
     }
