@@ -488,7 +488,6 @@ export default function AdminDashboard() {
 
           <SectionLabel label="Configuration" />
           <NavItem icon={<Tag size={16}/>} label="Categories" active={activeTab==='categories'} onClick={()=>setActiveTab('categories')} />
-          <NavItem icon={<ImageIcon size={16}/>} label="Banners" active={activeTab==='banners'} onClick={()=>setActiveTab('banners')} />
           <NavItem icon={<Bell size={16}/>} label="Offers" active={activeTab==='offers'} onClick={()=>setActiveTab('offers')} />
           <NavItem icon={<MapPin size={16}/>} label="Cities" active={activeTab==='cities'} onClick={()=>setActiveTab('cities')} />
           <NavItem icon={<Settings size={16}/>} label="Settings" active={activeTab==='settings'} onClick={()=>setActiveTab('settings')} />
@@ -531,7 +530,6 @@ export default function AdminDashboard() {
               {activeTab === 'bookings-all' && <JobsTable jobs={data.allBookings} title="Booking history" onView={(j)=>openAction('booking-detail', j)} />}
               {activeTab === 'categories' && <CategoriesView categories={data.categories} refresh={()=>fetchTabData('categories')} />}
               {activeTab === 'offers' && <OffersView offers={data.offers} refresh={()=>fetchTabData('offers')} onAdd={()=>openAction('add-offer')} />}
-              {activeTab === 'banners' && <BannersView banners={data.banners} refresh={()=>fetchTabData('banners')} onAdd={()=>openAction('add-banner')} />}
               {activeTab === 'reports' && <ReportsView reports={data.reports} onUpdate={(id, s)=>adminApi.updateReport(id, s).then(()=>{fetchTabData('reports'); showToast("Updated");})} />}
               {activeTab === 'reviews' && <ReviewsView reviews={data.reviews} onDelete={(id)=>adminApi.deleteReview(id).then(()=>{fetchTabData('reviews'); showToast("Deleted");})} />}
               {activeTab === 'transactions' && <TransactionsView transactions={data.transactions} />}
