@@ -23,8 +23,9 @@ const formatTimeAgo = (date) => {
   const now = new Date();
   const past = new Date(date);
   const diff = Math.floor((now - past) / 1000);
+
   if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}min ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
   return `${Math.floor(diff / 2592000)}mo ago`;
@@ -1126,7 +1127,7 @@ const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner, sos
                         <p className="text-[11px] text-gray-400">{p.phoneNumber}</p>
                         {p.status === 'offline' && (
                           <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
-                             • <Clock size={10} /> {formatTimeAgo(p.updatedAt || p.lastSeen)}
+                             • <Clock size={10} /> {formatTimeAgo(p.lastUpdated || p.updatedAt)}
                           </span>
                         )}
                       </div>
@@ -1347,7 +1348,7 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
                           <p className="text-[11.5px] text-gray-400">{u.phoneNumber}</p>
                           {isPartner && u.status === 'offline' && (
                             <span className="text-[10px] text-gray-300 font-medium flex items-center gap-0.5">
-                              • {formatTimeAgo(u.updatedAt || u.lastSeen)}
+                              • {formatTimeAgo(u.updatedAt || u.createdAt)}
                             </span>
                           )}
                         </div>
