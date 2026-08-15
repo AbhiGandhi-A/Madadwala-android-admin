@@ -666,14 +666,6 @@ export default function AdminDashboard() {
                     <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Banner Image</label>
                     <input type="file" onChange={e=>setFormState({...formState, bannerImage: e.target.files[0]})} className="w-full text-xs" accept="image/*" />
                   </div>
-                  <div>
-                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Title</label>
-                    <input value={formState.title} onChange={e=>setFormState({...formState, title: e.target.value})} placeholder="Banner title" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[13px] focus:border-indigo-400 focus:bg-white transition-colors" />
-                  </div>
-                  <div>
-                    <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">Subtitle</label>
-                    <input value={formState.description} onChange={e=>setFormState({...formState, description: e.target.value})} placeholder="Banner subtitle" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none text-[13px] focus:border-indigo-400 focus:bg-white transition-colors" />
-                  </div>
                 </div>
               )}
 
@@ -1650,15 +1642,11 @@ const BannersView = ({ banners, refresh, onAdd }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-300">
     {banners.map(b => (
       <div key={b._id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden group hover:shadow-md transition-shadow relative">
-        <img src={b.image} className="h-48 w-full object-cover" />
-        <div className="p-5">
-          <h4 className="font-semibold text-gray-900 text-[14px]">{b.title}</h4>
-          <p className="text-gray-500 text-[12.5px] mt-1">{b.subtitle}</p>
-          <button onClick={()=>adminApi.deleteBanner(b._id).then(refresh)} className="absolute top-4 right-4 p-2.5 bg-white text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white shadow-md"><Trash2 size={16}/></button>
-        </div>
+        <img src={b.image} className="h-64 w-full object-cover" />
+        <button onClick={()=>adminApi.deleteBanner(b._id).then(refresh)} className="absolute top-4 right-4 p-2.5 bg-white text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white shadow-md"><Trash2 size={16}/></button>
       </div>
     ))}
-    <button onClick={onAdd} className="bg-indigo-600 rounded-2xl min-h-[220px] flex flex-col items-center justify-center text-white hover:bg-indigo-500 transition-colors">
+    <button onClick={onAdd} className="bg-indigo-600 rounded-2xl min-h-[256px] flex flex-col items-center justify-center text-white hover:bg-indigo-500 transition-colors">
       <div className="p-5 bg-white/10 rounded-full"><Plus size={28} strokeWidth={2.5}/></div>
       <span className="font-semibold text-[12.5px] mt-4">Add banner</span>
     </button>
