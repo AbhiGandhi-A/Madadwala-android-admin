@@ -1333,7 +1333,7 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
                     <div className="flex items-center gap-3 cursor-pointer" onClick={()=>onDetails(u)}>
                       <div className="relative">
                         <img src={u.profileImage || 'https://via.placeholder.com/32'} className="w-9 h-9 rounded-full object-cover" />
-                        {isPartner && u.status === 'online' && (
+                        {isPartner && u.isOnline && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white"></div>
                         )}
                         {isPartner && u.walletBalance < -100 && (
@@ -1346,7 +1346,7 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
                         <p className="font-semibold text-gray-800 text-[13px]">{u.name || 'Unnamed user'}</p>
                         <div className="flex items-center gap-1.5">
                           <p className="text-[11.5px] text-gray-400">{u.phoneNumber}</p>
-                          {isPartner && u.status === 'offline' && (
+                          {isPartner && !u.isOnline && (
                             <span className="text-[10px] text-gray-300 font-medium flex items-center gap-0.5">
                               • {formatTimeAgo(u.updatedAt || u.createdAt)}
                             </span>
@@ -1361,7 +1361,12 @@ const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, tit
                     </div>
                   </td>
                   <td className="px-6 py-3.5 text-center">
-                    <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${u.isBlocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>{u.isBlocked ? 'Blocked' : 'Active'}</span>
+                    <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${
+                      u.isBlocked ? 'bg-red-50 text-red-600' :
+                      (isPartner ? (u.isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400') : 'bg-emerald-50 text-emerald-600')
+                    }`}>
+                      {u.isBlocked ? 'Blocked' : (isPartner ? (u.isOnline ? 'Online' : 'Offline') : 'Active')}
+                    </span>
                   </td>
                   <td className="px-6 py-3.5 text-right space-x-1.5 whitespace-nowrap">
                     <button title="Call" onClick={() => initiateCall(u.uid, u.name)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors"><Phone size={15}/></button>
