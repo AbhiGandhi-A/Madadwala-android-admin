@@ -18,6 +18,18 @@ const MapComponent = dynamic(() => import('@/components/MapComponent'), {
   loading: () => <div className="h-full w-full bg-gray-50 flex items-center justify-center text-sm font-medium text-gray-400">Loading map…</div>
 });
 
+const formatTimeAgo = (date) => {
+  if (!date) return 'Long ago';
+  const now = new Date();
+  const past = new Date(date);
+  const diff = Math.floor((now - past) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
+  return `${Math.floor(diff / 2592000)}mo ago`;
+};
+
 /* ---------- Font (Inter) ---------- */
 const FontStyles = () => (
   <style jsx global>{`
@@ -1050,28 +1062,57 @@ function NavItem({ icon, label, active, onClick, count }) {
 /* ---------- Live map ---------- */
 const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner, sosProviderUid }) => {
   const [filter, setFilter] = useState('all');
-  const filteredData = data.filter(p => filter === 'all' || p.status === filter);
-  const counts = { total: data.length, online: data.filter(p => p.status === 'online').length, busy: data.filter(p => p.status === 'busy').length };
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredData = data.filter(p => {
+    const matchesFilter = filter === 'all' || p.status === filter;
+    const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.phoneNumber?.includes(searchQuery);
+    return matchesFilter && matchesSearch;
+  });
+
+  const counts = {
+    total: data.length,
+    online: data.filter(p => p.status === 'online').length,
+    busy: data.filter(p => p.status === 'busy').length,
+    offline: data.filter(p => p.status === 'offline').length
+  };
 
   return (
     <div className="p-6 space-y-5 h-full flex flex-col">
       <div className="flex justify-between items-end">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Live partner tracking</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-gray-900">Live partner tracking</h3>
+            <span className="px-2 py-0.5 bg-gray-100 text-gray-400 text-[10px] rounded font-bold uppercase tracking-tight">Real-time</span>
+          </div>
           <p className="text-gray-500 text-[12.5px] mt-0.5">See where partners are and what they're doing right now</p>
         </div>
         <div className="flex gap-2">
           <StatusPill color="bg-emerald-500" label="Online" count={counts.online} />
           <StatusPill color="bg-indigo-500" label="Busy" count={counts.busy} />
+          <StatusPill color="bg-gray-400" label="Offline" count={counts.offline} />
         </div>
       </div>
 
       <div className="flex-1 flex gap-5 min-h-0">
-        <div className="w-72 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="p-2.5 border-b border-gray-100 flex gap-1.5 bg-gray-50">
-            {['all', 'online', 'busy'].map(f => (
-              <button key={f} onClick={()=>setFilter(f)} className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold capitalize transition-colors ${filter===f ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>{f}</button>
-            ))}
+        <div className="w-80 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="p-2.5 border-b border-gray-100 bg-gray-50 space-y-2">
+            <div className="flex gap-1.5">
+              {['all', 'online', 'busy', 'offline'].map(f => (
+                <button key={f} onClick={()=>setFilter(f)} className={`flex-1 py-1.5 rounded-md text-[10px] font-bold capitalize transition-colors ${filter===f ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>{f}</button>
+              ))}
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+              <input
+                type="text"
+                placeholder="Search by name or phone..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-[11px] outline-none focus:border-indigo-400 transition-colors"
+              />
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
             {filteredData.map(p => (
@@ -1080,14 +1121,24 @@ const MonitorView = ({ data, onRefresh, selectedPartner, setSelectedPartner, sos
                   <div className="flex items-center gap-2.5">
                     <img src={p.profileImage || 'https://via.placeholder.com/24'} className="w-9 h-9 rounded-lg object-cover" />
                     <div>
-                      <p className="font-semibold text-gray-800 text-[12.5px] truncate w-24">{p.name}</p>
-                      <p className="text-[11px] text-gray-400">{p.phoneNumber}</p>
+                      <p className="font-semibold text-gray-800 text-[12.5px] truncate w-32">{p.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[11px] text-gray-400">{p.phoneNumber}</p>
+                        {p.status === 'offline' && (
+                          <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                             • <Clock size={10} /> {formatTimeAgo(p.updatedAt || p.lastSeen)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className={`w-2 h-2 rounded-full ${p.status === 'busy' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
+                  <div className={`w-2 h-2 rounded-full ${p.status === 'busy' ? 'bg-indigo-500' : (p.status === 'online' ? 'bg-emerald-500' : 'bg-gray-300')}`}></div>
                 </div>
               </div>
             ))}
+            {filteredData.length === 0 && (
+              <div className="py-12 text-center text-gray-400 text-[11px]">No partners found</div>
+            )}
           </div>
           <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-[11px] font-medium text-gray-400 text-center">{filteredData.length} partners shown</div>
         </div>
@@ -1238,66 +1289,95 @@ const StatCard = ({ title, value, color }) => (
 );
 
 /* ---------- Users table ---------- */
-const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, title, isPartner }) => (
-  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
-    <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-      <h3 className="font-semibold text-gray-900 text-[14px]">{title}</h3>
-      <span className="px-3 py-1 bg-gray-50 rounded-full text-[11.5px] font-medium text-gray-500">{users?.length || 0} total</span>
-    </div>
-    <div className="overflow-x-auto custom-scrollbar">
-      <table className="w-full text-left">
-        <thead>
-          <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
-            <th className="px-6 py-3">Name</th>
-            <th className="px-6 py-3 text-center">Status</th>
-            <th className="px-6 py-3 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {!users || users.length === 0 ? (
-            <tr><td colSpan="3" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">No records yet</td></tr>
-          ) : (
-            users.map(u => (
-              <tr key={u.uid} className={`hover:bg-gray-50/60 transition-colors group ${isPartner && u.walletBalance < -100 ? 'bg-red-50/50' : ''}`}>
-                <td className="px-6 py-3.5">
-                  <div className="flex items-center gap-3 cursor-pointer" onClick={()=>onDetails(u)}>
-                    <div className="relative">
-                      <img src={u.profileImage || 'https://via.placeholder.com/32'} className="w-9 h-9 rounded-full object-cover" />
-                      {isPartner && u.walletBalance < -100 && (
-                        <div className="absolute -top-1 -right-1 bg-red-500 text-white p-0.5 rounded-full border-2 border-white">
-                          <AlertTriangle size={8} />
+const UsersTable = ({ users, onWarn, onWallet, onDelete, onBlock, onDetails, title, isPartner }) => {
+  const [q, setQ] = useState('');
+  const filtered = users?.filter(u =>
+    u.name?.toLowerCase().includes(q.toLowerCase()) ||
+    u.phoneNumber?.includes(q)
+  ) || [];
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+      <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <h3 className="font-semibold text-gray-900 text-[14px]">{title}</h3>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search by name or phone..."
+              className="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-[11px] outline-none focus:bg-white focus:border-indigo-400 w-60 transition-all"
+            />
+          </div>
+        </div>
+        <span className="px-3 py-1 bg-gray-50 rounded-full text-[11.5px] font-medium text-gray-500">{filtered.length} total</span>
+      </div>
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+              <th className="px-6 py-3">Name</th>
+              <th className="px-6 py-3 text-center">Status</th>
+              <th className="px-6 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filtered.length === 0 ? (
+              <tr><td colSpan="3" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">No records match your search</td></tr>
+            ) : (
+              filtered.map(u => (
+                <tr key={u.uid} className={`hover:bg-gray-50/60 transition-colors group ${isPartner && u.walletBalance < -100 ? 'bg-red-50/50' : ''}`}>
+                  <td className="px-6 py-3.5">
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={()=>onDetails(u)}>
+                      <div className="relative">
+                        <img src={u.profileImage || 'https://via.placeholder.com/32'} className="w-9 h-9 rounded-full object-cover" />
+                        {isPartner && u.status === 'online' && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white"></div>
+                        )}
+                        {isPartner && u.walletBalance < -100 && (
+                          <div className="absolute -top-1 -right-1 bg-red-500 text-white p-0.5 rounded-full border-2 border-white">
+                            <AlertTriangle size={8} />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-800 text-[13px]">{u.name || 'Unnamed user'}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[11.5px] text-gray-400">{u.phoneNumber}</p>
+                          {isPartner && u.status === 'offline' && (
+                            <span className="text-[10px] text-gray-300 font-medium flex items-center gap-0.5">
+                              • {formatTimeAgo(u.updatedAt || u.lastSeen)}
+                            </span>
+                          )}
                         </div>
-                      )}
+                        {isPartner && (
+                          <p className={`text-[10px] font-bold ${u.walletBalance < -100 ? 'text-red-500' : 'text-emerald-600'}`}>
+                            Wallet: ₹{u.walletBalance?.toFixed(2) || 0}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-800 text-[13px]">{u.name || 'Unnamed user'}</p>
-                      <p className="text-[11.5px] text-gray-400">{u.phoneNumber}</p>
-                      {isPartner && (
-                        <p className={`text-[10px] font-bold ${u.walletBalance < -100 ? 'text-red-500' : 'text-emerald-600'}`}>
-                          Wallet: ₹{u.walletBalance?.toFixed(2) || 0}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-3.5 text-center">
-                  <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${u.isBlocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>{u.isBlocked ? 'Blocked' : 'Active'}</span>
-                </td>
-                <td className="px-6 py-3.5 text-right space-x-1.5 whitespace-nowrap">
-                  <button title="Call" onClick={() => initiateCall(u.uid, u.name)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors"><Phone size={15}/></button>
-                  <button title="Warn" onClick={()=>onWarn(u)} className="p-2 bg-amber-50 text-amber-500 rounded-lg hover:bg-amber-500 hover:text-white transition-colors"><AlertTriangle size={15}/></button>
-                  <button title="Wallet" onClick={()=>onWallet(u)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"><Wallet size={15}/></button>
-                  <button title={u.isBlocked ? 'Unblock' : 'Block'} onClick={()=>onBlock(u)} className={`p-2 rounded-lg transition-colors ${u.isBlocked ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-900 hover:text-white'}`}><ShieldAlert size={15}/></button>
-                  <button title="Delete" onClick={()=>onDelete(u)} className="p-2 bg-red-50 text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-colors"><Trash2 size={15}/></button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+                  </td>
+                  <td className="px-6 py-3.5 text-center">
+                    <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${u.isBlocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>{u.isBlocked ? 'Blocked' : 'Active'}</span>
+                  </td>
+                  <td className="px-6 py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                    <button title="Call" onClick={() => initiateCall(u.uid, u.name)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors"><Phone size={15}/></button>
+                    <button title="Warn" onClick={()=>onWarn(u)} className="p-2 bg-amber-50 text-amber-500 rounded-lg hover:bg-amber-500 hover:text-white transition-colors"><AlertTriangle size={15}/></button>
+                    <button title="Wallet" onClick={()=>onWallet(u)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"><Wallet size={15}/></button>
+                    <button title={u.isBlocked ? 'Unblock' : 'Block'} onClick={()=>onBlock(u)} className={`p-2 rounded-lg transition-colors ${u.isBlocked ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-900 hover:text-white'}`}><ShieldAlert size={15}/></button>
+                    <button title="Delete" onClick={()=>onDelete(u)} className="p-2 bg-red-50 text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-colors"><Trash2 size={15}/></button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ---------- Pending approvals ---------- */
 const PendingView = ({ providers, onApprove, onReject, onViewKyc }) => (
@@ -1449,45 +1529,67 @@ const WithdrawalsTable = ({ withdrawals, onHandle }) => {
 };
 
 /* ---------- Jobs / bookings ---------- */
-const JobsTable = ({ jobs, title, onView }) => (
-  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
-    <div className="px-6 py-4 border-b border-gray-100 font-semibold text-gray-900 text-[14px] flex justify-between items-center">
-      <span>{title}</span>
-      <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full font-medium text-[11.5px]">{jobs?.length || 0} total</span>
-    </div>
-    <table className="w-full text-left border-collapse">
-      <thead>
-        <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
-          <th className="px-6 py-3">Service</th>
-          <th className="px-6 py-3">Status</th>
-          <th className="px-6 py-3 text-right">Amount</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-50">
-        {(!jobs || jobs.length === 0) ? (
-          <tr><td colSpan="3" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">Nothing here yet</td></tr>
-        ) : (
-          jobs.map(j => (
-            <tr key={j._id} onClick={()=>onView(j)} className="hover:bg-gray-50/60 transition-colors group cursor-pointer">
-              <td className="px-6 py-4">
-                <p className="font-semibold text-gray-800 text-[13.5px] group-hover:text-indigo-600 transition-colors">{j.serviceName}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-[11px] font-medium text-gray-400">{new Date(j.createdAt).toLocaleDateString()}</p>
-                  <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                  <p className="text-[11px] font-medium text-gray-400 truncate max-w-[150px]">{j.customerName}</p>
-                </div>
-              </td>
-              <td className="px-6 py-4">
-                <span className={`px-3 py-1 rounded-full text-[11px] font-semibold capitalize ${j.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>{j.status.replace('_',' ')}</span>
-              </td>
-              <td className="px-6 py-4 text-right font-bold text-[15px] text-gray-900">₹{j.totalAmount}</td>
+const JobsTable = ({ jobs, title, onView }) => {
+  const [q, setQ] = useState('');
+  const filtered = jobs?.filter(j =>
+    j.serviceName?.toLowerCase().includes(q.toLowerCase()) ||
+    j.customerName?.toLowerCase().includes(q.toLowerCase()) ||
+    j.status?.toLowerCase().includes(q.toLowerCase())
+  ) || [];
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+      <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <span className="font-semibold text-gray-900 text-[14px]">{title}</span>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search jobs..."
+              className="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-[11px] outline-none focus:bg-white focus:border-indigo-400 w-60 transition-all"
+            />
+          </div>
+        </div>
+        <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full font-medium text-[11.5px]">{filtered.length} shown</span>
+      </div>
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/60 text-[11px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+              <th className="px-6 py-3">Service</th>
+              <th className="px-6 py-3">Status</th>
+              <th className="px-6 py-3 text-right">Amount</th>
             </tr>
-          ))
-        )}
-      </tbody>
-    </table>
-  </div>
-);
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filtered.length === 0 ? (
+              <tr><td colSpan="3" className="px-6 py-24 text-center text-gray-300 font-medium text-[13px]">No matching jobs</td></tr>
+            ) : (
+              filtered.map(j => (
+                <tr key={j._id} onClick={()=>onView(j)} className="hover:bg-gray-50/60 transition-colors group cursor-pointer">
+                  <td className="px-6 py-4">
+                    <p className="font-semibold text-gray-800 text-[13.5px] group-hover:text-indigo-600 transition-colors">{j.serviceName}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[11px] font-medium text-gray-400">{new Date(j.createdAt).toLocaleDateString()}</p>
+                      <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                      <p className="text-[11px] font-medium text-gray-400 truncate max-w-[150px]">{j.customerName}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-3 py-1 rounded-full text-[11px] font-semibold capitalize ${j.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>{j.status.replace('_',' ')}</span>
+                  </td>
+                  <td className="px-6 py-4 text-right font-bold text-[15px] text-gray-900">₹{j.totalAmount}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
 
 /* ---------- Categories ---------- */
 const CategoriesView = ({ categories, refresh }) => {
